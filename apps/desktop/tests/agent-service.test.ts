@@ -1,13 +1,178 @@
-import { expect, it } from 'vitest';
-import { AgentService, modelHistory } from '../src/main/agent-service';
-import { ToolGateway, createBuiltinTools } from '../src/main/tool-gateway';
-import { openStore } from '../../../packages/storage/src/index';
-import { ProviderService } from '../src/main/provider-service';
-import { SecretStore } from '../src/main/credentials';
-import type { AgentEvent, RunInput, ToolCall, ToolResult } from '../../../packages/shared/src/index';
-import { namespaceA, namespaceB, validDraft } from '../../../tests/fixtures/data';
-function setup() { const store = openStore(':memory:'); const providers = new ProviderService(store.providers, new SecretStore(store.credentials, { isAvailable: async () => false, isSecure: async () => false, encrypt: async () => new Uint8Array(), decrypt: async () => '' })); const workers = new Map<string, { input: RunInput; event: (e: AgentEvent) => Promise<void>; tool: (c: ToolCall) => Promise<ToolResult>; exit: () => Promise<void> }>(); const supervisor = { start: (input: RunInput, _key: string, event: (e: AgentEvent) => Promise<void>, tool: (c: ToolCall) => Promise<ToolResult>, exit: () => Promise<void>) => { workers.set(input.runId, { input, event, tool, exit }); }, cancel: () => {}, shutdown: async () => {} }; const notifications: AgentEvent[] = []; return { store, providers, workers, service: new AgentService(store, providers, supervisor, createBuiltinTools(), () => namespaceA, e => notifications.push(e)), notifications }; }
-it('starts atomically, denies another identity and persists before publishing', async () => { const s = setup(); try { const p = await s.providers.save(namespaceA, validDraft, 'key'), session = s.store.sessions.create(namespaceA, { title: 'test', providerId: p.id }); const run = await s.service.start(namespaceA, session.id, 'hello'); await expect(s.service.start(namespaceA, session.id, 'again')).rejects.toThrow(/RUN_ACTIVE/); await expect(s.service.cancel(namespaceB, run.id)).rejects.toThrow(/NOT_FOUND/); const worker = s.workers.get(run.id)!; await worker.event({ type: 'status', status: 'running' }); await worker.event({ type: 'text_delta', text: 'partial' }); await worker.exit(); expect(s.store.runs.get(namespaceA, run.id).status).toBe('interrupted'); expect(s.store.sessions.messages(namespaceA, session.id).at(-1)).toMatchObject({ content: 'partial', status: 'interrupted' }); expect(s.notifications).toHaveLength(s.store.runs.events(namespaceA, run.id).length); } finally { s.store.close(); } });
-it('executes a call once and refuses unresolved or changed duplicate calls', async () => { const s = setup(); try { const p = await s.providers.save(namespaceA, validDraft, 'key'), session = s.store.sessions.create(namespaceA, { title: 'test', providerId: p.id }), r = s.store.runs.createWithUserMessage(namespaceA, session.id, 'hi'), gateway = new ToolGateway(s.store.runs, createBuiltinTools()); const ctx = { namespace: namespaceA, sessionId: session.id, runId: r.id }, call = { id: 'c', name: 'get_current_time', arguments: '{}' }, signal = new AbortController().signal; expect(await gateway.execute(call, ctx, signal)).toEqual(await gateway.execute(call, ctx, signal)); await expect(gateway.execute({ ...call, arguments: '{"timezone":"UTC"}' }, ctx, signal)).rejects.toThrow(/MODEL_PROTOCOL_ERROR/); s.store.runs.reserveToolCall(namespaceA, r.id, { ...call, id: 'unresolved' }); await expect(gateway.execute({ ...call, id: 'unresolved' }, ctx, signal)).rejects.toThrow(/TOOL_UNRESOLVED/); await expect(gateway.execute({ ...call, id: 'invalid', arguments: '{"timezone":"invalid/zone"}' }, ctx, signal)).rejects.toThrow(/INVALID_INPUT/); } finally { s.store.close(); } });
-it('drops incomplete tool groups and partial messages from model history', () => { const records = [{ role: 'user', content: 'hi', status: 'complete' }, { role: 'assistant', content: null, status: 'complete', toolCalls: [{ id: 'c', name: 'time', arguments: '{}' }] }, { role: 'assistant', content: 'partial', status: 'partial' }]; expect(modelHistory(records as Parameters<typeof modelHistory>[0])).toEqual([{ role: 'user', content: 'hi' }]); });
-it('cancels and suppresses late text while permitting a new run after the terminal event', async () => { const s = setup(); try { const p = await s.providers.save(namespaceA, validDraft, 'key'), session = s.store.sessions.create(namespaceA, { title: 'test', providerId: p.id }), r = await s.service.start(namespaceA, session.id, 'hello'), w = s.workers.get(r.id)!; await w.event({ type: 'status', status: 'running' }); await w.event({ type: 'text_delta', text: 'keep' }); await s.service.cancel(namespaceA, r.id); await w.event({ type: 'text_delta', text: 'discard' }); await w.event({ type: 'status', status: 'cancelled' }); expect(s.store.sessions.messages(namespaceA, session.id).at(-1)).toMatchObject({ content: 'keep', status: 'partial' }); expect(s.store.runs.get(namespaceA, r.id).status).toBe('cancelled'); expect((await s.service.start(namespaceA, session.id, 'again')).status).toBe('queued'); } finally { s.store.close(); } });
+import { expect, it } from "vitest";
+import { AgentService, modelHistory } from "../src/main/agent-service";
+import { ToolGateway, createBuiltinTools } from "../src/main/tool-gateway";
+import { openStore } from "../../../packages/storage/src/index";
+import { ProviderService } from "../src/main/provider-service";
+import { SecretStore } from "../src/main/credentials";
+import type {
+  AgentEvent,
+  RunInput,
+  ToolCall,
+  ToolResult,
+} from "../../../packages/shared/src/index";
+import {
+  namespaceA,
+  namespaceB,
+  validDraft,
+} from "../../../tests/fixtures/data";
+function setup() {
+  const store = openStore(":memory:");
+  const providers = new ProviderService(
+    store.providers,
+    new SecretStore(store.credentials, {
+      isAvailable: async () => false,
+      isSecure: async () => false,
+      encrypt: async () => new Uint8Array(),
+      decrypt: async () => "",
+    }),
+  );
+  const workers = new Map<
+    string,
+    {
+      input: RunInput;
+      event: (e: AgentEvent) => Promise<void>;
+      tool: (c: ToolCall) => Promise<ToolResult>;
+      exit: () => Promise<void>;
+    }
+  >();
+  const supervisor = {
+    start: (
+      input: RunInput,
+      _key: string,
+      event: (e: AgentEvent) => Promise<void>,
+      tool: (c: ToolCall) => Promise<ToolResult>,
+      exit: () => Promise<void>,
+    ) => {
+      workers.set(input.runId, { input, event, tool, exit });
+    },
+    cancel: () => {},
+    shutdown: async () => {},
+  };
+  const notifications: AgentEvent[] = [];
+  return {
+    store,
+    providers,
+    workers,
+    service: new AgentService(
+      store,
+      providers,
+      supervisor,
+      createBuiltinTools(),
+      () => namespaceA,
+      (e) => notifications.push(e),
+    ),
+    notifications,
+  };
+}
+it("starts atomically, denies another identity and persists before publishing", async () => {
+  const s = setup();
+  try {
+    const p = await s.providers.save(namespaceA, validDraft, "key"),
+      session = s.store.sessions.create(namespaceA, {
+        title: "test",
+        providerId: p.id,
+      });
+    const run = await s.service.start(namespaceA, session.id, "hello");
+    await expect(
+      s.service.start(namespaceA, session.id, "again"),
+    ).rejects.toThrow(/RUN_ACTIVE/);
+    await expect(s.service.cancel(namespaceB, run.id)).rejects.toThrow(
+      /NOT_FOUND/,
+    );
+    const worker = s.workers.get(run.id)!;
+    await worker.event({ type: "status", status: "running" });
+    await worker.event({ type: "text_delta", text: "partial" });
+    await worker.exit();
+    expect(s.store.runs.get(namespaceA, run.id).status).toBe("interrupted");
+    expect(
+      s.store.sessions.messages(namespaceA, session.id).at(-1),
+    ).toMatchObject({ content: "partial", status: "interrupted" });
+    expect(s.notifications).toHaveLength(
+      s.store.runs.events(namespaceA, run.id).length,
+    );
+  } finally {
+    s.store.close();
+  }
+});
+it("executes a call once and refuses unresolved or changed duplicate calls", async () => {
+  const s = setup();
+  try {
+    const p = await s.providers.save(namespaceA, validDraft, "key"),
+      session = s.store.sessions.create(namespaceA, {
+        title: "test",
+        providerId: p.id,
+      }),
+      r = s.store.runs.createWithUserMessage(namespaceA, session.id, "hi"),
+      gateway = new ToolGateway(s.store.runs, createBuiltinTools());
+    const ctx = { namespace: namespaceA, sessionId: session.id, runId: r.id },
+      call = { id: "c", name: "get_current_time", arguments: "{}" },
+      signal = new AbortController().signal;
+    expect(await gateway.execute(call, ctx, signal)).toEqual(
+      await gateway.execute(call, ctx, signal),
+    );
+    await expect(
+      gateway.execute(
+        { ...call, arguments: '{"timezone":"UTC"}' },
+        ctx,
+        signal,
+      ),
+    ).rejects.toThrow(/MODEL_PROTOCOL_ERROR/);
+    s.store.runs.reserveToolCall(namespaceA, r.id, {
+      ...call,
+      id: "unresolved",
+    });
+    await expect(
+      gateway.execute({ ...call, id: "unresolved" }, ctx, signal),
+    ).rejects.toThrow(/TOOL_UNRESOLVED/);
+    await expect(
+      gateway.execute(
+        { ...call, id: "invalid", arguments: '{"timezone":"invalid/zone"}' },
+        ctx,
+        signal,
+      ),
+    ).rejects.toThrow(/INVALID_INPUT/);
+  } finally {
+    s.store.close();
+  }
+});
+it("drops incomplete tool groups and partial messages from model history", () => {
+  const records = [
+    { role: "user", content: "hi", status: "complete" },
+    {
+      role: "assistant",
+      content: null,
+      status: "complete",
+      toolCalls: [{ id: "c", name: "time", arguments: "{}" }],
+    },
+    { role: "assistant", content: "partial", status: "partial" },
+  ];
+  expect(modelHistory(records as Parameters<typeof modelHistory>[0])).toEqual([
+    { role: "user", content: "hi" },
+  ]);
+});
+it("cancels and suppresses late text while permitting a new run after the terminal event", async () => {
+  const s = setup();
+  try {
+    const p = await s.providers.save(namespaceA, validDraft, "key"),
+      session = s.store.sessions.create(namespaceA, {
+        title: "test",
+        providerId: p.id,
+      }),
+      r = await s.service.start(namespaceA, session.id, "hello"),
+      w = s.workers.get(r.id)!;
+    await w.event({ type: "status", status: "running" });
+    await w.event({ type: "text_delta", text: "keep" });
+    await s.service.cancel(namespaceA, r.id);
+    await w.event({ type: "text_delta", text: "discard" });
+    await w.event({ type: "status", status: "cancelled" });
+    expect(
+      s.store.sessions.messages(namespaceA, session.id).at(-1),
+    ).toMatchObject({ content: "keep", status: "partial" });
+    expect(s.store.runs.get(namespaceA, r.id).status).toBe("cancelled");
+    expect(
+      (await s.service.start(namespaceA, session.id, "again")).status,
+    ).toBe("queued");
+  } finally {
+    s.store.close();
+  }
+});

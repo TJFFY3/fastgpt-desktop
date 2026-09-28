@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type {
   MessageRecord,
   ProviderView,
@@ -20,28 +20,49 @@ const active = [
   "cancelling",
 ];
 export default function App() {
+  const initiallySelected = useRef(false);
+  const selection = useRef({ id: null as string | null, generation: 0 });
   const [providers, setProviders] = useState<ProviderView[]>([]),
     [providerId, setProviderId] = useState(""),
     [selectedId, setSelectedId] = useState<string | null>(null),
+    [selectedSnapshot, setSelectedSnapshot] = useState<SessionRecord | null>(
+      null,
+    ),
     [query, setQuery] = useState(""),
     [archived, setArchived] = useState(false),
     [settings, setSettings] = useState(false),
     [error, setError] = useState(""),
     [messages, setMessages] = useState<MessageRecord[]>([]),
     [run, setRun] = useState<RunRecord | null>(null),
-    [starting, setStarting] = useState(false);
+    [pendingStarts, setPendingStarts] = useState<Set<string>>(new Set());
+  const selectSession = useCallback((record: SessionRecord | null) => {
+    initiallySelected.current = true;
+    selection.current = {
+      id: record?.id ?? null,
+      generation: selection.current.generation + 1,
+    };
+    setSelectedSnapshot(record);
+    setSelectedId(record?.id ?? null);
+    setRun(null);
+    setMessages([]);
+    setError("");
+  }, []);
   const fail = useCallback(
       (value: string) => setError(value.replace(/^Error:\s*/, "")),
       [],
     ),
     { sessions, refresh } = useSessions(query, archived, fail),
-    selected = sessions.find((s) => s.id === selectedId),
+    selected =
+      sessions.find((s) => s.id === selectedId) ??
+      (selectedSnapshot?.id === selectedId ? selectedSnapshot : undefined),
     { events, error: eventError } = useRunEvents(run?.id ?? null);
   const latestStatus =
       events.flatMap((e) => (e.type === "status" ? [e.status] : [])).at(-1) ??
       run?.status ??
       null,
-    busy = starting || (!!latestStatus && active.includes(latestStatus));
+    busy =
+      pendingStarts.has(selectedId ?? "") ||
+      (!!latestStatus && active.includes(latestStatus));
   const refreshProviders = useCallback(async () => {
     try {
       const values = await window.desktop.providers.list();
@@ -57,10 +78,17 @@ export default function App() {
     void refreshProviders();
   }, [refreshProviders]);
   useEffect(() => {
-    if (!selectedId && sessions.length) setSelectedId(sessions[0].id);
+    if (!initiallySelected.current && sessions.length) {
+      selectSession(sessions[0]);
+    }
+  }, [sessions, selectSession]);
+  useEffect(() => {
+    const record = sessions.find((s) => s.id === selectedId);
+    if (record) setSelectedSnapshot(record);
   }, [sessions, selectedId]);
   useEffect(() => {
     let alive = true;
+    const generation = selection.current.generation;
     setMessages([]);
     setRun(null);
     if (selectedId)
@@ -69,13 +97,14 @@ export default function App() {
         window.desktop.runs.list(selectedId),
       ])
         .then(([m, r]) => {
-          if (alive) {
+          if (alive && selection.current.generation === generation) {
             setMessages(m);
             setRun(r.at(-1) ?? null);
           }
         })
         .catch((e) => {
-          if (alive) fail(String(e));
+          if (alive && selection.current.generation === generation)
+            fail(String(e));
         });
     return () => {
       alive = false;
@@ -84,12 +113,17 @@ export default function App() {
   useEffect(() => {
     if (!selectedId || !latestStatus || active.includes(latestStatus)) return;
     let alive = true;
+    const generation = selection.current.generation;
     void window.desktop.sessions
       .messages(selectedId)
       .then((m) => {
-        if (alive) setMessages(m);
+        if (alive && selection.current.generation === generation)
+          setMessages(m);
       })
-      .catch((e) => fail(String(e)));
+      .catch((e) => {
+        if (alive && selection.current.generation === generation)
+          fail(String(e));
+      });
     void refresh();
     return () => {
       alive = false;
@@ -101,6 +135,7 @@ export default function App() {
       return;
     }
     try {
+      const generation = selection.current.generation;
       setError("");
       setArchived(false);
       setQuery("");
@@ -108,7 +143,7 @@ export default function App() {
         title: "新会话",
         providerId,
       });
-      setSelectedId(s.id);
+      if (selection.current.generation === generation) selectSession(s);
       await refresh();
     } catch (e) {
       fail(String(e));
@@ -119,9 +154,10 @@ export default function App() {
     patch: { title?: string; pinned?: boolean; archived?: boolean },
   ) => {
     try {
-      await window.desktop.sessions.update(id, patch);
-      if (patch.archived !== undefined && id === selectedId)
-        setSelectedId(null);
+      const updated = await window.desktop.sessions.update(id, patch);
+      if (id === selection.current.id) setSelectedSnapshot(updated);
+      if (patch.archived !== undefined && id === selection.current.id)
+        selectSession(null);
       await refresh();
     } catch (e) {
       fail(String(e));
@@ -136,11 +172,7 @@ export default function App() {
       return;
     try {
       await window.desktop.sessions.remove(s.id);
-      if (s.id === selectedId) {
-        setSelectedId(null);
-        setRun(null);
-        setMessages([]);
-      }
+      if (s.id === selection.current.id) selectSession(null);
       await refresh();
     } catch (e) {
       fail(String(e));
@@ -148,21 +180,31 @@ export default function App() {
   };
   const send = async (text: string) => {
     if (!selectedId || busy) return false;
-    setStarting(true);
+    const id = selectedId,
+      generation = ++selection.current.generation;
+    const stillSelected = () =>
+      selection.current.id === id &&
+      selection.current.generation === generation;
+    setPendingStarts((previous) => new Set(previous).add(id));
     setError("");
     try {
-      const next = await window.desktop.runs.start(selectedId, text);
-      setRun(next);
-      setMessages(await window.desktop.sessions.messages(selectedId));
+      const next = await window.desktop.runs.start(id, text);
+      if (stillSelected()) setRun(next);
+      const history = await window.desktop.sessions.messages(id);
+      if (stillSelected()) setMessages(history);
       if (selected?.title === "新会话")
-        await update(selectedId, { title: text.slice(0, 30) });
+        await update(id, { title: text.slice(0, 30) });
       await refresh();
       return true;
     } catch (e) {
-      fail(String(e));
+      if (stillSelected()) fail(String(e));
       return false;
     } finally {
-      setStarting(false);
+      setPendingStarts((previous) => {
+        const next = new Set(previous);
+        next.delete(id);
+        return next;
+      });
     }
   };
   const runtimeError = events
@@ -181,8 +223,7 @@ export default function App() {
         onQuery={setQuery}
         onArchived={setArchived}
         onSelect={(id) => {
-          setSelectedId(id);
-          setError("");
+          selectSession(sessions.find((s) => s.id === id) ?? null);
         }}
         onNew={() => void newSession()}
         onSettings={() => setSettings(true)}
@@ -239,11 +280,12 @@ export default function App() {
         <div className="chat-bottom">
           <RunDetails status={latestStatus} events={events} />
           <Composer
+            key={selectedId ?? "none"}
             busy={busy}
             stopping={latestStatus === "cancelling"}
             disabled={
-              !selectedId ||
-              archived ||
+              !selected ||
+              selected.archived ||
               selectedProvider?.credentialState === "missing"
             }
             onSend={send}

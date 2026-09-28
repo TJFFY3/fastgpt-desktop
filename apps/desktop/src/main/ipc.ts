@@ -98,6 +98,7 @@ export function registerIpc(
     principal: () => Namespace;
     window: () => Sender;
     devOrigin?: string;
+    beforeRunStart?: () => Promise<void>;
   },
 ) {
   const { store, providers, agents } = services;
@@ -155,6 +156,7 @@ export function registerIpc(
             data = store.runs.list(n, value.sessionId);
             break;
           case "runs:start":
+            await services.beforeRunStart?.();
             data = await agents.start(n, value.sessionId, value.text);
             break;
           case "runs:cancel":

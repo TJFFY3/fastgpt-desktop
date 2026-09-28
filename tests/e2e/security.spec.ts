@@ -23,7 +23,7 @@ test("renderer has only the narrow bridge, CSP blocks network and keys stay off 
     });
     const sandboxed = await app.evaluate(({ app, BrowserWindow }) => {
       const pid = BrowserWindow.getAllWindows()[0].webContents.getOSProcessId();
-      return app.getAppMetrics().find(m => m.pid === pid)?.sandboxed;
+      return app.getAppMetrics().find((m) => m.pid === pid)?.sandboxed;
     });
     expect(sandboxed).toBe(true);
     expect(

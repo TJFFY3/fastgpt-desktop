@@ -5,10 +5,17 @@ import {
 } from "@playwright/test";
 import { resolve } from "node:path";
 import { validDraft } from "../fixtures/data";
-export const launch = (directory: string) =>
+export const launch = (
+  directory: string,
+  extraEnv: Record<string, string> = {},
+) =>
   _electron.launch({
     args: [resolve("apps/desktop")],
-    env: { ...process.env, FASTGPT_DESKTOP_TEST_DATA_DIR: directory },
+    env: {
+      ...process.env,
+      ...extraEnv,
+      FASTGPT_DESKTOP_TEST_DATA_DIR: directory,
+    },
   });
 export async function configure(app: ElectronApplication, baseUrl: string) {
   const page = await app.firstWindow();

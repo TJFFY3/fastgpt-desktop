@@ -1,9 +1,87 @@
-import { EventEmitter } from 'node:events';
-import { expect, it, vi } from 'vitest';
-import { WorkerSupervisor } from '../src/main/worker-supervisor';
-import { fakeModelProfile, namespaceA } from '../../../tests/fixtures/data';
-import type { RunInput, WorkerCommand } from '../../../packages/shared/src/index';
-class Child extends EventEmitter { sent: WorkerCommand[] = []; killed = false; postMessage(c: WorkerCommand) { this.sent.push(c); } kill() { this.killed = true; this.emit('exit', 0); return true; } }
-const input: RunInput = { runId: 'run', sessionId: 's', namespace: namespaceA, profile: fakeModelProfile, messages: [], tools: [] };
-it('waits for event persistence before acknowledging and rejects unbound run IDs', async () => { const child = new Child(), worker = new WorkerSupervisor(() => child); let resolve!: () => void; const persisted = new Promise<void>(r => { resolve = r; }); let exits = 0; worker.start(input, 'key', () => persisted, async () => ({ content: '', isError: false }), async () => { exits++; }); child.emit('message', { type: 'ready' }); expect(child.sent[0].type).toBe('start'); child.emit('message', { type: 'event', runId: 'run', requestId: 'ack', event: { type: 'text_delta', text: 'hi' } }); await Promise.resolve(); expect(child.sent).toHaveLength(1); resolve(); await vi.waitFor(() => expect(child.sent.at(-1)?.type).toBe('event_ack')); child.emit('message', { type: 'event', runId: 'other', requestId: 'bad', event: { type: 'text_delta', text: 'bad' } }); await vi.waitFor(() => expect(exits).toBe(1)); expect(child.killed).toBe(true); });
-it('aborts first and force-stops an unresponsive worker after two seconds', async () => { vi.useFakeTimers(); try { const child = new Child(), worker = new WorkerSupervisor(() => child); worker.start(input, 'key', async () => {}, async () => ({ content: '', isError: false }), async () => {}); worker.cancel('run'); expect(child.sent[0]).toEqual({ type: 'cancel', runId: 'run' }); expect(child.killed).toBe(false); await vi.advanceTimersByTimeAsync(2000); expect(child.killed).toBe(true); } finally { vi.useRealTimers(); } });
+import { EventEmitter } from "node:events";
+import { expect, it, vi } from "vitest";
+import { WorkerSupervisor } from "../src/main/worker-supervisor";
+import { fakeModelProfile, namespaceA } from "../../../tests/fixtures/data";
+import type {
+  RunInput,
+  WorkerCommand,
+} from "../../../packages/shared/src/index";
+class Child extends EventEmitter {
+  sent: WorkerCommand[] = [];
+  killed = false;
+  postMessage(c: WorkerCommand) {
+    this.sent.push(c);
+  }
+  kill() {
+    this.killed = true;
+    this.emit("exit", 0);
+    return true;
+  }
+}
+const input: RunInput = {
+  runId: "run",
+  sessionId: "s",
+  namespace: namespaceA,
+  profile: fakeModelProfile,
+  messages: [],
+  tools: [],
+};
+it("waits for event persistence before acknowledging and rejects unbound run IDs", async () => {
+  const child = new Child(),
+    worker = new WorkerSupervisor(() => child);
+  let resolve!: () => void;
+  const persisted = new Promise<void>((r) => {
+    resolve = r;
+  });
+  let exits = 0;
+  worker.start(
+    input,
+    "key",
+    () => persisted,
+    async () => ({ content: "", isError: false }),
+    async () => {
+      exits++;
+    },
+  );
+  child.emit("message", { type: "ready" });
+  expect(child.sent[0].type).toBe("start");
+  child.emit("message", {
+    type: "event",
+    runId: "run",
+    requestId: "ack",
+    event: { type: "text_delta", text: "hi" },
+  });
+  await Promise.resolve();
+  expect(child.sent).toHaveLength(1);
+  resolve();
+  await vi.waitFor(() => expect(child.sent.at(-1)?.type).toBe("event_ack"));
+  child.emit("message", {
+    type: "event",
+    runId: "other",
+    requestId: "bad",
+    event: { type: "text_delta", text: "bad" },
+  });
+  await vi.waitFor(() => expect(exits).toBe(1));
+  expect(child.killed).toBe(true);
+});
+it("aborts first and force-stops an unresponsive worker after two seconds", async () => {
+  vi.useFakeTimers();
+  try {
+    const child = new Child(),
+      worker = new WorkerSupervisor(() => child);
+    worker.start(
+      input,
+      "key",
+      async () => {},
+      async () => ({ content: "", isError: false }),
+      async () => {},
+    );
+    worker.cancel("run");
+    expect(child.sent[0]).toEqual({ type: "cancel", runId: "run" });
+    expect(child.killed).toBe(false);
+    await vi.advanceTimersByTimeAsync(2000);
+    expect(child.killed).toBe(true);
+  } finally {
+    vi.useRealTimers();
+  }
+});

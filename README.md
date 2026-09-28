@@ -38,7 +38,7 @@ npm run test:e2e
 npm run package:dir
 ```
 
-E2E 自动构建独立测试模式，启动真实 Electron + SQLite + utility process，使用随机本地端口的模型测试服务和临时数据目录。仅测试构建允许 `FASTGPT_DESKTOP_TEST_DATA_DIR`，并强制会话内存密钥以免触碰系统钥匙串。生产构建会移除测试覆盖和开发地址读取；不包含内置 mock 模型或通用执行接口。
+E2E 自动构建独立测试模式，启动真实 Electron + SQLite + utility process，使用随机本地端口的模型测试服务和临时数据目录。仅测试构建允许 `FASTGPT_DESKTOP_TEST_DATA_DIR` 和最多两秒的启动延迟设置（复现密钥库异步响应时快速切换会话的竞态），并强制会话内存密钥以免触碰系统钥匙串。生产构建会移除测试覆盖和开发地址读取；不包含内置 mock 模型或通用执行接口。
 
 `package:dir` 会先重建生产模式，再在 `release/` 生成本机未签名目录包；不上传、不发布。macOS 产物为 `release/mac-arm64/FastGPT Desktop.app`（对应本机架构）。不建议分发测试构建。
 
@@ -64,4 +64,8 @@ E2E 自动构建独立测试模式，启动真实 Electron + SQLite + utility pr
 
 没有真实模型凭据、FastGPT 实例或 SSO 配置时，本地协议测试不能替代这些外部验收。
 
+已知次要显示问题：模型在调用工具前完成的解释文字，可能在后续模型请求期间暂时不显示；运行结束后会从已保存历史完整恢复，不丢失数据。后续可改为逐条合并已提交的消息事件。
+
 详见 [架构设计](docs/superpowers/specs/2026-09-28-fastgpt-desktop-agent-design.md) 与 [阶段 A 计划](docs/superpowers/plans/2026-09-28-phase-a-agent-foundation.md)。
+
+本次实际检查结果、独立审查修复和执行决策见 [阶段 A 验收记录](docs/superpowers/reviews/2026-09-28-phase-a-verification.md)。
