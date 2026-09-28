@@ -1,6 +1,7 @@
-import type { Database } from './database';
+import type { Database } from "./database";
 export function migrate(db: Database) {
-  db.transaction(() => db.raw.exec(`
+  db.transaction(() =>
+    db.raw.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY);
     CREATE TABLE IF NOT EXISTS providers(namespace_key TEXT NOT NULL, id TEXT NOT NULL, data TEXT NOT NULL, PRIMARY KEY(namespace_key,id));
     CREATE TABLE IF NOT EXISTS credentials(namespace_key TEXT NOT NULL, ref TEXT NOT NULL, ciphertext BLOB NOT NULL, PRIMARY KEY(namespace_key,ref));
@@ -11,5 +12,6 @@ export function migrate(db: Database) {
     CREATE TABLE IF NOT EXISTS run_events(namespace_key TEXT NOT NULL, run_id TEXT NOT NULL, seq INTEGER NOT NULL, data TEXT NOT NULL, PRIMARY KEY(namespace_key,run_id,seq), FOREIGN KEY(namespace_key,run_id) REFERENCES runs(namespace_key,id) ON DELETE CASCADE);
     CREATE TABLE IF NOT EXISTS tool_calls(namespace_key TEXT NOT NULL, run_id TEXT NOT NULL, call_id TEXT NOT NULL, name TEXT NOT NULL, arguments TEXT NOT NULL, result TEXT, PRIMARY KEY(namespace_key,run_id,call_id), FOREIGN KEY(namespace_key,run_id) REFERENCES runs(namespace_key,id) ON DELETE CASCADE);
     INSERT OR IGNORE INTO schema_migrations VALUES(1);
-  `));
+  `),
+  );
 }

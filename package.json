@@ -7,10 +7,11 @@
   "scripts": {
     "dev": "npm run dev -w @fastgpt/desktop",
     "build": "npm run build -w @fastgpt/desktop",
+    "build:test": "npm run build -w @fastgpt/desktop -- --mode test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "test:e2e": "playwright test",
-    "package:dir": "npm run package:dir -w @fastgpt/desktop"
+    "test:e2e": "npm run build:test && playwright test",
+    "package:dir": "npm run build && npm run package:dir -w @fastgpt/desktop"
   },
   "devDependencies": {
     "@playwright/test": "1.63.0",

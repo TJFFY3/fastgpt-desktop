@@ -1,19 +1,179 @@
-import { expect, it } from 'vitest';
-import { AgentRunner, ToolRegistry, enforceToolPolicy } from '../src/index';
-import type { AgentEvent, ModelAdapter, ModelEvent, ModelRequest, RunInput } from '../../shared/src/index';
-import { fakeModelProfile, namespaceA } from '../../../tests/fixtures/data';
-const spec = { name: 'get_current_time', description: 'time', parameters: { type: 'object', properties: {}, additionalProperties: false } };
-const input: RunInput = { runId: 'r', sessionId: 's', namespace: namespaceA, profile: fakeModelProfile, messages: [{ role: 'user', content: 'hi' }], tools: [spec] };
-function model(rounds: ModelEvent[][], requests: ModelRequest[]): ModelAdapter { return { probe: async () => ({ reachable: true, tools: true }), async *stream(r) { requests.push(r); for (const e of rounds[requests.length - 1] ?? []) yield e; } }; }
-async function run(rounds: ModelEvent[][], override: Partial<RunInput> = {}) { const events: AgentEvent[] = [], requests: ModelRequest[] = [], calls: string[] = []; await new AgentRunner({ model: model(rounds, requests), executor: { execute: async call => { calls.push(call.id); return { content: 'now', isError: false }; } }, onEvent: async e => { events.push(e); } }).run({ ...input, ...override }, 'key', new AbortController().signal); return { events, requests, calls }; }
-const tool: ModelEvent[] = [{ type: 'tool_call_delta', index: 0, id: 'c1', name: 'get_current_time', argumentsDelta: '{}' }, { type: 'finish', reason: 'tool_calls' }];
-it('streams text and persists a complete assistant message', async () => { const r = await run([[{ type: 'text_delta', text: 'hi' }, { type: 'finish', reason: 'stop' }]]); expect(r.events).toContainEqual({ type: 'assistant_message', message: { role: 'assistant', content: 'hi' } }); expect(r.events.at(-1)).toEqual({ type: 'status', status: 'completed' }); });
-it('assembles tool calls and supplies paired tool history on the next round', async () => { const r = await run([tool, [{ type: 'text_delta', text: 'done' }, { type: 'finish', reason: 'stop' }]]); expect(r.calls).toEqual(['c1']); expect(r.requests[1].messages.at(-1)).toEqual({ role: 'tool', toolCallId: 'c1', content: 'now' }); });
+import { expect, it } from "vitest";
+import { AgentRunner, ToolRegistry, enforceToolPolicy } from "../src/index";
+import type {
+  AgentEvent,
+  ModelAdapter,
+  ModelEvent,
+  ModelRequest,
+  RunInput,
+} from "../../shared/src/index";
+import { fakeModelProfile, namespaceA } from "../../../tests/fixtures/data";
+const spec = {
+  name: "get_current_time",
+  description: "time",
+  parameters: { type: "object", properties: {}, additionalProperties: false },
+};
+const input: RunInput = {
+  runId: "r",
+  sessionId: "s",
+  namespace: namespaceA,
+  profile: fakeModelProfile,
+  messages: [{ role: "user", content: "hi" }],
+  tools: [spec],
+};
+function model(rounds: ModelEvent[][], requests: ModelRequest[]): ModelAdapter {
+  return {
+    probe: async () => ({ reachable: true, tools: true }),
+    async *stream(r) {
+      requests.push(r);
+      for (const e of rounds[requests.length - 1] ?? []) yield e;
+    },
+  };
+}
+async function run(rounds: ModelEvent[][], override: Partial<RunInput> = {}) {
+  const events: AgentEvent[] = [],
+    requests: ModelRequest[] = [],
+    calls: string[] = [];
+  await new AgentRunner({
+    model: model(rounds, requests),
+    executor: {
+      execute: async (call) => {
+        calls.push(call.id);
+        return { content: "now", isError: false };
+      },
+    },
+    onEvent: async (e) => {
+      events.push(e);
+    },
+  }).run({ ...input, ...override }, "key", new AbortController().signal);
+  return { events, requests, calls };
+}
+const tool: ModelEvent[] = [
+  {
+    type: "tool_call_delta",
+    index: 0,
+    id: "c1",
+    name: "get_current_time",
+    argumentsDelta: "{}",
+  },
+  { type: "finish", reason: "tool_calls" },
+];
+it("streams text and persists a complete assistant message", async () => {
+  const r = await run([
+    [
+      { type: "text_delta", text: "hi" },
+      { type: "finish", reason: "stop" },
+    ],
+  ]);
+  expect(r.events).toContainEqual({
+    type: "assistant_message",
+    message: { role: "assistant", content: "hi" },
+  });
+  expect(r.events.at(-1)).toEqual({ type: "status", status: "completed" });
+});
+it("assembles tool calls and supplies paired tool history on the next round", async () => {
+  const r = await run([
+    tool,
+    [
+      { type: "text_delta", text: "done" },
+      { type: "finish", reason: "stop" },
+    ],
+  ]);
+  expect(r.calls).toEqual(["c1"]);
+  expect(r.requests[1].messages.at(-1)).toEqual({
+    role: "tool",
+    toolCallId: "c1",
+    content: "now",
+  });
+});
 it.each([
-  [{ type: 'tool_call_delta', index: 0, id: 'c1', name: 'get_current_time', argumentsDelta: '{}' }],
-  [{ type: 'tool_call_delta', index: 0, id: 'c1', name: 'get_current_time', argumentsDelta: '{bad' }, { type: 'finish', reason: 'tool_calls' }],
-  [{ type: 'tool_call_delta', index: 0, id: 'c1', name: 'shell', argumentsDelta: '{}' }, { type: 'finish', reason: 'tool_calls' }],
-] as ModelEvent[][])('never executes incomplete or invalid tool calls', async (...round) => { const r = await run([round as ModelEvent[]]); expect(r.calls).toEqual([]); expect(r.events.at(-1)).toEqual({ type: 'status', status: 'failed' }); });
-it('omits tools for text-only models and bounds an endless tool loop', async () => { const r = await run(Array.from({ length: 13 }, (_, i) => tool.map(e => e.type === 'tool_call_delta' ? { ...e, id: `c${i}` } : e))); expect(r.requests).toHaveLength(12); expect(r.events).toContainEqual({ type: 'error', code: 'RUN_LIMIT', message: '已达到单次任务的模型轮数上限' }); const text = await run([[{ type: 'finish', reason: 'stop' }]], { profile: { ...fakeModelProfile, capabilities: { ...fakeModelProfile.capabilities, tools: false } } }); expect(text.requests[0].tools).toEqual([]); });
-it('cancels before any model or tool execution', async () => { const events: AgentEvent[] = [], requests: ModelRequest[] = [], controller = new AbortController(); controller.abort(); await new AgentRunner({ model: model([tool], requests), executor: { execute: async () => { throw Error('must not execute'); } }, onEvent: async e => { events.push(e); } }).run(input, 'key', controller.signal); expect(requests).toEqual([]); expect(events.at(-1)).toEqual({ type: 'status', status: 'cancelled' }); });
-it('denies mutating tools and validates arguments before execution', async () => { const registry = new ToolRegistry(); registry.register({ spec, risk: 'mutating', validate: () => ({}), execute: async () => ({ content: '', isError: false }) }); expect(() => enforceToolPolicy(registry.get(spec.name)!)).toThrow(/PERMISSION_DENIED/); });
+  [
+    {
+      type: "tool_call_delta",
+      index: 0,
+      id: "c1",
+      name: "get_current_time",
+      argumentsDelta: "{}",
+    },
+  ],
+  [
+    {
+      type: "tool_call_delta",
+      index: 0,
+      id: "c1",
+      name: "get_current_time",
+      argumentsDelta: "{bad",
+    },
+    { type: "finish", reason: "tool_calls" },
+  ],
+  [
+    {
+      type: "tool_call_delta",
+      index: 0,
+      id: "c1",
+      name: "shell",
+      argumentsDelta: "{}",
+    },
+    { type: "finish", reason: "tool_calls" },
+  ],
+] as ModelEvent[][])(
+  "never executes incomplete or invalid tool calls",
+  async (...round) => {
+    const r = await run([round as ModelEvent[]]);
+    expect(r.calls).toEqual([]);
+    expect(r.events.at(-1)).toEqual({ type: "status", status: "failed" });
+  },
+);
+it("omits tools for text-only models and bounds an endless tool loop", async () => {
+  const r = await run(
+    Array.from({ length: 13 }, (_, i) =>
+      tool.map((e) =>
+        e.type === "tool_call_delta" ? { ...e, id: `c${i}` } : e,
+      ),
+    ),
+  );
+  expect(r.requests).toHaveLength(12);
+  expect(r.events).toContainEqual({
+    type: "error",
+    code: "RUN_LIMIT",
+    message: "已达到单次任务的模型轮数上限",
+  });
+  const text = await run([[{ type: "finish", reason: "stop" }]], {
+    profile: {
+      ...fakeModelProfile,
+      capabilities: { ...fakeModelProfile.capabilities, tools: false },
+    },
+  });
+  expect(text.requests[0].tools).toEqual([]);
+});
+it("cancels before any model or tool execution", async () => {
+  const events: AgentEvent[] = [],
+    requests: ModelRequest[] = [],
+    controller = new AbortController();
+  controller.abort();
+  await new AgentRunner({
+    model: model([tool], requests),
+    executor: {
+      execute: async () => {
+        throw Error("must not execute");
+      },
+    },
+    onEvent: async (e) => {
+      events.push(e);
+    },
+  }).run(input, "key", controller.signal);
+  expect(requests).toEqual([]);
+  expect(events.at(-1)).toEqual({ type: "status", status: "cancelled" });
+});
+it("denies mutating tools and validates arguments before execution", async () => {
+  const registry = new ToolRegistry();
+  registry.register({
+    spec,
+    risk: "mutating",
+    validate: () => ({}),
+    execute: async () => ({ content: "", isError: false }),
+  });
+  expect(() => enforceToolPolicy(registry.get(spec.name)!)).toThrow(
+    /PERMISSION_DENIED/,
+  );
+});
