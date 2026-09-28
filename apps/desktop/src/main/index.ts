@@ -21,6 +21,7 @@ import { installProtocol } from "./protocol";
 import { registerIpc } from "./ipc";
 import { createFeatureServices } from "./feature-services";
 import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
+import { registerWorkspaceHandlers } from "./ipc/workspace-handlers";
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -80,7 +81,9 @@ else
       let agents: AgentService;
       const principal = new PrincipalService((n) => agents.cancelNamespace(n));
       const window = await createWindow(join(__dirname, "../preload/index.js"));
-      const features=createFeatureServices({store,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id});
+      const features=createFeatureServices({store,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id,
+        pickWorkspace:async()=>{const result=await dialog.showOpenDialog(window,{title:"选择工作目录（先预览，不会上传）",properties:["openDirectory"]});return result.canceled?null:result.filePaths[0]??null;},
+      });
       app.on("second-instance", () => {
         if (window.isDestroyed()) return;
         if (window.isMinimized()) window.restore();
@@ -127,6 +130,7 @@ else
         pick:async()=>{const result=await dialog.showOpenDialog(window,{title:"添加附件（只创建本地副本）",properties:["openFile","multiSelections"]});return result.canceled?[]:result.filePaths;},
         confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
       });
+      registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
       if (devUrl) await window.loadURL(devUrl);
       else {
         await installProtocol(join(__dirname, "../renderer"));

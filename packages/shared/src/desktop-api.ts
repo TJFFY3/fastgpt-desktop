@@ -9,9 +9,10 @@ import type {
   SessionPatch,
   SessionRecord,
 } from "./types";
-import type { RunStartOptions, RunTimingSnapshot, AttachmentApi } from "./feature-types";
+import type { RunStartOptions, RunTimingSnapshot, AttachmentApi, WorkspaceApi } from "./feature-types";
 export interface DesktopApi {
   attachments:AttachmentApi;
+  workspaces:WorkspaceApi;
   providers: {
     list(): Promise<ProviderView[]>;
     save(

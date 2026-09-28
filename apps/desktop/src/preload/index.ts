@@ -11,6 +11,7 @@ async function invoke<T>(channel: string, input: unknown): Promise<T> {
   return result.data;
 }
 const api: DesktopApi = {
+  workspaces:{ensure:sessionId=>invoke("workspaces:ensure",{sessionId}),previewSelection:sessionId=>invoke("workspaces:preview",{sessionId}),importSelection:(sessionId,grantId)=>invoke("workspaces:import",{sessionId,grantId}),list:(sessionId,cursor)=>invoke("workspaces:list",{sessionId,...(cursor?{cursor}:{})}),read:(sessionId,path,offset,maxBytes)=>invoke("workspaces:read",{sessionId,path,offset,maxBytes}),diff:sessionId=>invoke("workspaces:diff",{sessionId})},
   attachments:{
     pick:sessionId=>invoke("attachments:pick",{sessionId}),
     importDropped:(sessionId,files)=>{

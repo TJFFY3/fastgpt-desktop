@@ -37,6 +37,15 @@ export class SafeFileOps {
     safeRelativePath(path);if(!Number.isSafeInteger(limit)||limit<0||limit>100*1024*1024) throw new AppError("INVALID_INPUT","文件限额无效");
     return fingerprintSchema.parse(JSON.parse((await this.invoke(["copy",...await this.root(root),path,destination,String(limit)],4096)).toString("utf8")));
   }
+  async scanWorkspace(root:string):Promise<{entries:FileEntry[];excluded:string[];fingerprints:Map<string,FileFingerprint>}> {
+    const buffer=await this.invoke(["workspace-scan",...await this.root(root),"10000",String(100*1024*1024),String(1024**3)]);
+    const entries:FileEntry[]=[],excluded:string[]=[],fingerprints=new Map<string,FileFingerprint>();
+    try {const text=new TextDecoder("utf-8",{fatal:true}).decode(buffer);for(const line of text.trim()?text.trim().split("\n"):[]) {
+      const parsed=z.union([z.strictObject({excluded:z.string().max(1024)}),z.strictObject({entry:fileEntrySchema,fingerprint:fingerprintSchema.nullable()})]).parse(JSON.parse(line));
+      if("excluded"in parsed){safeRelativePath(parsed.excluded);excluded.push(parsed.excluded);}else{entries.push(parsed.entry);if(parsed.fingerprint)fingerprints.set(parsed.entry.relativePath,parsed.fingerprint);}
+    }assertNoPathCollisions(entries.map(e=>e.relativePath));entries.sort((a,b)=>a.relativePath<b.relativePath?-1:a.relativePath>b.relativePath?1:0);return {entries,excluded:excluded.sort(),fingerprints};}
+    catch(e){if(e instanceof AppError)throw e;throw new AppError("UNSAFE_PATH","目录预览数据无效");}
+  }
   async read(root:string,path:string,offset:number,max:number):Promise<Uint8Array> {
     safeRelativePath(path);if(!Number.isSafeInteger(offset)||offset<0||!Number.isSafeInteger(max)||max<1||max>65536) throw new AppError("INVALID_RANGE","读取范围无效");
     return new Uint8Array(await this.invoke(["read",...await this.root(root),path,String(offset),String(max)],65536));

@@ -54,6 +54,7 @@ export class ArtifactStore implements SandboxFileBridge {
     this.entries.set(key,new Map());return key;
   }
   async localPath(key:string):Promise<string> {await this.owned(key);return join(this.root,key);}
+  async isTemporary(key:string):Promise<boolean> {return (await this.owned(key)).state==="temporary";}
   async manifest(key:string):Promise<FileEntry[]> {
     const entries=await this.fileMap(key);return [...entries.values()].map(e=>({...e}));
   }
