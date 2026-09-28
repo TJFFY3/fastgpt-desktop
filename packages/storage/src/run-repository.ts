@@ -97,6 +97,14 @@ export class RunRepository {
       .all(namespaceKey(n), sessionId)
       .map(record);
   }
+  saveTiming(n:Namespace,id:string,elapsedMs:number):RunRecord {
+    const run=this.get(n,id);
+    if(!Number.isFinite(elapsedMs) || elapsedMs<0) throw new AppError("INVALID_INPUT","耗时无效");
+    if(!activeStatuses.includes(run.status)) return run;
+    this.db.raw.prepare("UPDATE runs SET elapsed_ms=MAX(elapsed_ms,?),timing_updated_at=? WHERE namespace_key=? AND id=?")
+      .run(elapsedMs,Date.now(),namespaceKey(n),id);
+    return this.get(n,id);
+  }
   transition(
     n: Namespace,
     id: string,

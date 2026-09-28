@@ -113,3 +113,13 @@ it("retains streamed partial text and a recovery event after an application rest
   store.runs.recoverInterrupted();
   expect(store.sessions.messages(namespaceA, sessionId)).toHaveLength(2);
 });
+it("restart retains the last confirmed elapsed checkpoint and terminal timing cannot be overwritten",()=>{
+  const run=store.runs.createWithUserMessage(namespaceA,sessionId,"hi");
+  store.runs.saveTiming(namespaceA,run.id,5000);store.runs.saveTiming(namespaceA,run.id,4000);
+  expect(store.runs.get(namespaceA,run.id).elapsedMs).toBe(5000);
+  store.close();store=openStore(path);store.runs.recoverInterrupted();
+  expect(store.runs.get(namespaceA,run.id)).toMatchObject({status:"interrupted",elapsedMs:5000});
+  store.runs.saveTiming(namespaceA,run.id,9000);
+  expect(store.runs.get(namespaceA,run.id).elapsedMs).toBe(5000);
+  expect(()=>store.runs.saveTiming(namespaceB,run.id,9999)).toThrow(/NOT_FOUND/);
+});

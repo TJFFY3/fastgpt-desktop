@@ -9,7 +9,7 @@ import type {
   SessionPatch,
   SessionRecord,
 } from "./types";
-import type { RunStartOptions } from "./feature-types";
+import type { RunStartOptions, RunTimingSnapshot } from "./feature-types";
 export interface DesktopApi {
   providers: {
     list(): Promise<ProviderView[]>;
@@ -31,6 +31,7 @@ export interface DesktopApi {
     messages(id: string): Promise<MessageRecord[]>;
   };
   runs: {
+    timing(runId:string):Promise<RunTimingSnapshot>;
     list(sessionId: string): Promise<RunRecord[]>;
     start(sessionId: string, text: string, options?: RunStartOptions): Promise<RunRecord>;
     cancel(runId: string): Promise<void>;

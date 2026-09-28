@@ -1,9 +1,9 @@
 import {
   AppError,
-  sendMessageSchema,
+  runStartSchema,
   type AgentEvent,
-  type ChatMessage,
-  type MessageRecord,
+  type RunStartOptions,
+  type RunTimingSnapshot,
   type Namespace,
   type RunEvent,
   type RunInput,
@@ -18,6 +18,9 @@ import {
 import type { ToolRegistry } from "../../../../packages/agent-core/src/index";
 import type { ProviderService } from "./provider-service";
 import { ToolGateway } from "./tool-gateway";
+import { RunClock } from "./run-clock";
+import { RunStartService, type ContextPreparer } from "./run-start-service";
+export { modelHistory } from "./run-start-service";
 export interface Supervisor {
   start(
     input: RunInput,
@@ -28,45 +31,6 @@ export interface Supervisor {
   ): void;
   cancel(runId: string): void;
   shutdown(): Promise<void>;
-}
-export function modelHistory(records: MessageRecord[]): ChatMessage[] {
-  const result: ChatMessage[] = [];
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i];
-    if (r.status !== "complete" || r.role === "tool") continue;
-    const { role, content, toolCalls, toolCallId } = r,
-      message: ChatMessage = {
-        role,
-        content,
-        ...(toolCalls ? { toolCalls } : {}),
-        ...(toolCallId ? { toolCallId } : {}),
-      };
-    if (!toolCalls) {
-      result.push(message);
-      continue;
-    }
-    const following = records.slice(i + 1, i + 1 + toolCalls.length);
-    if (
-      following.length === toolCalls.length &&
-      following.every(
-        (m, j) =>
-          m.status === "complete" &&
-          m.role === "tool" &&
-          m.toolCallId === toolCalls[j].id,
-      )
-    ) {
-      result.push(
-        message,
-        ...following.map((m) => ({
-          role: "tool" as const,
-          content: m.content,
-          toolCallId: m.toolCallId,
-        })),
-      );
-      i += following.length;
-    }
-  }
-  return result;
 }
 export class AgentService {
   private running = new Map<
@@ -80,6 +44,8 @@ export class AgentService {
   >();
   private revoked = new Set<string>();
   private gateway: ToolGateway;
+  private clock:RunClock;
+  private starts:RunStartService;
   constructor(
     private store: Store,
     private providers: ProviderService,
@@ -87,24 +53,30 @@ export class AgentService {
     private tools: ToolRegistry,
     private principal: () => Namespace,
     private publish: (event: RunEvent) => void,
+    prepareContext?:ContextPreparer,
   ) {
     this.gateway = new ToolGateway(store.runs, tools);
+    this.starts=new RunStartService(store,providers,principal,()=>tools.definitions(),prepareContext);
+    this.clock=new RunClock((id,elapsed)=>{
+      const state=this.running.get(id);if(state) store.runs.saveTiming(state.namespace,id,elapsed);
+    },()=>performance.now(),(id)=>{
+      const state=this.running.get(id);state?.controller.abort();supervisor.cancel(id);
+    });
   }
-  async start(n: Namespace, sessionId: string, text: string) {
-    sendMessageSchema.parse({ sessionId, text });
+  async start(n: Namespace, sessionId: string, text: string, options?:RunStartOptions) {
+    const request=runStartSchema.parse({sessionId,text,...(options ?? {attachmentIds:[]})});
     if (
       this.revoked.has(namespaceKey(n)) ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
-    const session = this.store.sessions.get(n, sessionId),
-      resolved = await this.providers.resolve(n, session.providerId);
+    const prepared=await this.starts.prepare(n,request);
     if (
       this.revoked.has(namespaceKey(n)) ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
-    const run = this.store.runs.createWithUserMessage(n, sessionId, text),
+    const run = prepared.commit(),
       state = {
         namespace: n,
         controller: new AbortController(),
@@ -112,6 +84,7 @@ export class AgentService {
         error: null as string | null,
       };
     this.running.set(run.id, state);
+    this.clock.start(run.id);
     const event = async (value: AgentEvent) => {
       const persisted = this.store.transaction(() => {
         const current = this.store.runs.get(n, run.id);
@@ -128,6 +101,8 @@ export class AgentService {
             state.controller.signal.aborted && value.status === "completed"
               ? "cancelled"
               : value.status;
+          if(activeStatuses.includes(status)) this.clock.checkpoint(run.id);
+          else this.clock.finish(run.id);
           if (status !== current.status)
             this.store.runs.transition(n, run.id, status, state.error);
           value = { ...value, status };
@@ -138,6 +113,7 @@ export class AgentService {
                 sessionId,
                 { role: "assistant", content: state.partial },
                 status === "interrupted" ? "interrupted" : "partial",
+                {runId:run.id},
               );
             state.partial = "";
             this.running.delete(run.id);
@@ -149,6 +125,7 @@ export class AgentService {
             sessionId,
             value.message,
             "complete",
+            {runId:run.id},
           );
           if (value.message.role === "assistant") state.partial = "";
         } else if (value.type === "error") state.error = value.code;
@@ -177,11 +154,11 @@ export class AgentService {
           runId: run.id,
           sessionId,
           namespace: n,
-          profile: resolved.profile,
-          messages: modelHistory(this.store.sessions.messages(n, sessionId)),
-          tools: this.tools.definitions(),
+          profile: prepared.profile,
+          messages: prepared.messages,
+          tools: prepared.tools,
         },
-        resolved.apiKey,
+        prepared.apiKey,
         event,
         async (call) => {
           throwIfActive();
@@ -208,6 +185,7 @@ export class AgentService {
     if (!activeStatuses.includes(run.status)) return;
     const state = this.running.get(runId);
     state?.controller.abort();
+    this.clock.checkpoint(runId);
     if (run.status !== "cancelling") {
       this.store.runs.transition(n, runId, "cancelling");
       const e = this.store.runs.appendEvent(n, runId, {
@@ -226,4 +204,9 @@ export class AgentService {
         .map(([id]) => this.cancel(n, id)),
     );
   }
+  timing(n:Namespace,runId:string):RunTimingSnapshot {
+    const run=this.store.runs.get(n,runId),active=activeStatuses.includes(run.status);
+    return {runId,active,elapsedMs:active && this.running.has(runId)?this.clock.elapsed(runId):run.elapsedMs};
+  }
+  dispose():void {this.clock.dispose();}
 }

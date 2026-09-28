@@ -30,8 +30,9 @@ const api: DesktopApi = {
     messages: (id) => invoke("sessions:messages", { id }),
   },
   runs: {
+    timing:(runId)=>invoke("runs:timing",{runId}),
     list: (sessionId) => invoke("runs:list", { sessionId }),
-    start: (sessionId, text) => invoke("runs:start", { sessionId, text }),
+    start: (sessionId, text, options) => invoke("runs:start", { sessionId, text,...options }),
     cancel: (runId) => invoke("runs:cancel", { runId }),
     events: (runId, afterSeq = 0) => invoke("runs:events", { runId, afterSeq }),
   },

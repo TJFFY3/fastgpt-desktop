@@ -6,7 +6,7 @@ import {
   sessionDraftSchema,
   sessionFilterSchema,
   sessionPatchSchema,
-  sendMessageSchema,
+  runStartSchema,
   type Namespace,
 } from "../../../../packages/shared/src/index";
 import {
@@ -33,7 +33,8 @@ const inputs = {
   "sessions:remove": byId,
   "sessions:messages": byId,
   "runs:list": z.strictObject({ sessionId: id }),
-  "runs:start": sendMessageSchema,
+  "runs:start": runStartSchema,
+  "runs:timing": z.strictObject({runId:id}),
   "runs:cancel": z.strictObject({ runId: id }),
   "runs:events": z.strictObject({
     runId: id,
@@ -157,7 +158,10 @@ export function registerIpc(
             break;
           case "runs:start":
             await services.beforeRunStart?.();
-            data = await agents.start(n, value.sessionId, value.text);
+            data = await agents.start(n, value.sessionId, value.text,{attachmentIds:value.attachmentIds,expectedSessionRevision:value.expectedSessionRevision,expectedWorkspaceRevision:value.expectedWorkspaceRevision});
+            break;
+          case "runs:timing":
+            data=agents.timing(n,value.runId);
             break;
           case "runs:cancel":
             data = await agents.cancel(n, value.runId);
