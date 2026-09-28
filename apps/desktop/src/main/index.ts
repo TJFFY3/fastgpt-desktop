@@ -88,6 +88,7 @@ else
         dockerExecutable:process.platform==="darwin"?[join(homedir(),".docker/bin/docker"),"/usr/local/bin/docker"].find(p=>existsSync(p))??"/usr/local/bin/docker":process.platform==="win32"?"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe":"/usr/bin/docker",
         imageDirectory:app.isPackaged?join(process.resourcesPath,"sandbox-image"):resolve(app.getAppPath(),"../../packages/sandbox/image"),persistEvent:(context,event)=>agents.emit(context,event),
         pickWorkspace:async()=>{const result=await dialog.showOpenDialog(window,{title:"选择工作目录（先预览，不会上传）",properties:["openDirectory"]});return result.canceled?null:result.filePaths[0]??null;},
+        confirmExport:async(kind,paths)=>(await dialog.showMessageBox(window,{type:"warning",title:kind==="remove_backups"?"永久删除备份":"确认本地文件操作",message:kind==="delete"?"确认删除以下源文件？":kind==="restore"?"确认从备份恢复以下文件？":kind==="remove_backups"?"确认永久删除以下备份？删除后无法通过应用恢复。":"确认逐文件写入以下目标？",detail:paths.join("\n")+"\n覆盖和删除前会保留独立备份。操作不是整目录事务，请暂停其他程序对此目录的写入。",buttons:["确认","取消"],defaultId:1,cancelId:1})).response===0,
       });
       app.on("second-instance", () => {
         if (window.isDestroyed()) return;
@@ -137,7 +138,7 @@ else
         pick:async()=>{const result=await dialog.showOpenDialog(window,{title:"添加附件（只创建本地副本）",properties:["openFile","multiSelections"]});return result.canceled?[]:result.filePaths;},
         confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
       });
-      registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
+      registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,exports:features.exports,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
       registerApprovalHandlers(ipcMain,{approvals:features.approvals,sandbox:features.sandbox,store,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,dataDirectory:app.getPath("userData"),imagePreparation:features.imagePreparation});
       if (devUrl) await window.loadURL(devUrl);
       else {
@@ -152,6 +153,7 @@ else
         features.imagePreparation.controller?.abort();
         void supervisor.shutdown().then(async()=>{await Promise.allSettled([features.sandbox.shutdown(),features.imagePreparation.promise??Promise.resolve()]);}).finally(() => {
           agents.dispose();
+          features.exports.dispose();
           secrets.clearSessionOnly();
           store.close();
           app.quit();

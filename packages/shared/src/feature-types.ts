@@ -7,7 +7,7 @@ export type RunTimingSnapshot = { runId: string; elapsedMs: number; active: bool
 export type AttachmentRecord = { id: string; sessionId: string; name: string; size: number; sha256: string; kind: "text" | "binary"; state: "ready" | "sent"; snapshotKey: string };
 export type AttachmentView = Omit<AttachmentRecord, "snapshotKey">;
 export type WorkspaceView = { id: string; sessionId: string; sourceLabel: string | null; revision: number; entryCount: number; totalBytes: number };
-export type WorkspaceRecord = WorkspaceView & { sourceRoot: string | null; baselineKey: string; checkpointKey: string };
+export type WorkspaceRecord = WorkspaceView & { sourceRoot: string | null; sourceIdentity?:{device:string;inode:string}|null; baselineKey: string; checkpointKey: string };
 export type FileEntry = { relativePath: string; kind: "file" | "directory"; size: number; sha256: string | null };
 export type FileListPage = { entries: FileEntry[]; nextCursor: string | null };
 export type FileRead = { text: string; offset: number; nextOffset: number; remainingBytes: number; truncated: boolean };
@@ -63,7 +63,7 @@ export interface ExportApi {
   preview(sessionId: string, paths: string[]): Promise<ExportPreview>;
   apply(token: string, selections: ExportSelection[]): Promise<ExportResult[]>;
   exportToChosenDirectory(sessionId: string, paths: string[]): Promise<ExportResult[]>;
-  listBackups(workspaceId: string): Promise<BackupView[]>;
+  listBackups(workspaceId?: string): Promise<BackupView[]>;
   restoreBackup(backupId: string): Promise<ExportResult>;
   removeBackups(ids: string[]): Promise<void>;
 }

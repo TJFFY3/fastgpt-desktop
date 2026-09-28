@@ -13,4 +13,6 @@ export const workspaceInputs={
   "workspaces:read":z.strictObject({sessionId:id,path:z.string().min(1).max(1024),offset:z.number().int().nonnegative(),maxBytes:z.number().int().min(4).max(65536)}),
   "workspaces:diff":session,
 };
-export const featureInputs={...attachmentInputs,...workspaceInputs};
+const paths=z.array(z.string().min(1).max(1024)).min(1).max(1000);
+export const exportInputs={"exports:preview":z.strictObject({sessionId:id,paths}),"exports:apply":z.strictObject({token:z.string().uuid(),selections:z.array(z.strictObject({path:z.string().min(1).max(1024),action:z.enum(["write","delete","skip"])})).min(1).max(1000)}),"exports:directory":z.strictObject({sessionId:id,paths}),"exports:backups":z.strictObject({workspaceId:z.string().uuid().optional()}),"exports:restore":z.strictObject({id:z.string().uuid()}),"exports:remove":z.strictObject({ids:z.array(z.string().uuid()).min(1).max(1000)})};
+export const featureInputs={...attachmentInputs,...workspaceInputs,...exportInputs};

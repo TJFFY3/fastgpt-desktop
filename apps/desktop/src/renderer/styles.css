@@ -656,6 +656,25 @@ summary:focus-visible {
   max-height: 90vh;
   overflow: auto;
 }
+.nested-modal { z-index: 25; }
+.workspace-panel { width: min(100%, 1100px); }
+.workspace-content { padding: 22px 28px; }
+.workspace-content p { line-height: 1.7; overflow-wrap: anywhere; }
+.workspace-toolbar { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-bottom: 18px; }
+.workspace-toolbar > span { flex: 1; color: #77869d; }
+.workspace-columns { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-bottom: 24px; }
+.workspace-files, .workspace-diff { max-height: 38vh; overflow: auto; border: 1px solid #edf0f4; border-radius: 10px; padding: 14px; }
+.workspace-files > div, .workspace-diff > label, .export-choice { display: flex; align-items: center; gap: 8px; padding: 8px 0; overflow-wrap: anywhere; flex-wrap: wrap; }
+.workspace-files small, .backup-row small, .export-results small { display: block; color: #7b899f; font-size: 11px; overflow-wrap: anywhere; }
+.workspace-files small { margin-left: auto; }
+.diff-kind { font-size: 11px; border-radius: 4px; padding: 2px 5px; background: #eff3fc; }
+.diff-kind.deleted { background: #fff0ee; color: #b85454; }
+.diff-kind.added { background: #e9f7ef; color: #367852; }
+.backup-row { display: flex; align-items: center; gap: 8px; border-bottom: 1px solid #edf0f4; padding: 12px 0; }
+.backup-row > span { flex: 1; min-width: 0; }
+.export-results { background: #f4f6fa; border-radius: 10px; padding: 10px 16px; margin-top: 20px; }
+.export-dialog { max-width: 700px; }
+@media(max-width: 800px) { .workspace-columns { grid-template-columns: 1fr; } }
 .settings-modal > header {
   display: flex;
   justify-content: space-between;

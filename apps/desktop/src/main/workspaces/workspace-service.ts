@@ -12,11 +12,13 @@ import { workspaceDiff } from "./workspace-diff";
 type Options={store:Store;artifacts:ArtifactStore;files:SafeFileOps;grants:InputGrants;principal:()=>Namespace;window:()=>number;pick:()=>Promise<string|null>;credentialRoots:string[];snapshots?:WorkspaceSnapshots};
 type PreviewData=Awaited<ReturnType<SafeFileOps["scanWorkspace"]>>&{root:string;device:string;inode:string;namespaceKey:string;sessionId:string;window:number;workspaceId:string|null;revision:number;expires:number};
 type Checkout={namespaceKey:string;sessionId:string;workspace:WorkspaceRecord;expires:number};
-export const workspaceView=({sourceRoot:_,baselineKey:__,checkpointKey:___,...view}:WorkspaceRecord):WorkspaceView=>view;
+export const workspaceView=({sourceRoot:_,sourceIdentity:____,baselineKey:__,checkpointKey:___,...view}:WorkspaceRecord):WorkspaceView=>view;
 export class WorkspaceService {
   readonly snapshots:WorkspaceSnapshots;
+  readonly files:SafeFileOps;
   private previews=new Map<string,PreviewData>();private checkouts=new Map<string,Checkout>();
-  constructor(private o:Options) {this.snapshots=o.snapshots??new WorkspaceSnapshots(o.store,o.artifacts,o.principal);}
+  constructor(private o:Options) {this.files=o.files;this.snapshots=o.snapshots??new WorkspaceSnapshots(o.store,o.artifacts,o.principal);}
+  assertIdle(n:Namespace,sid:string):void{this.idle(n,sid);}
   private idle(n:Namespace,sid:string,signal?:AbortSignal):void {this.snapshots.check(n,sid,signal);if(this.o.store.runs.list(n,sid).some(r=>activeStatuses.includes(r.status)))throw new AppError("RUN_ACTIVE","运行期间不能重新导入工作区");if([...this.checkouts.values()].some(c=>c.namespaceKey===namespaceKey(n)&&c.sessionId===sid))throw new AppError("WORKSPACE_BUSY","工作区已有未完成的操作");}
   private current(n:Namespace,sid:string):WorkspaceRecord {this.snapshots.check(n,sid);const w=this.o.store.workspaces.getForSession(n,sid);if(!w)throw new AppError("NOT_FOUND","工作区尚未创建");return w;}
   private async space(key:string,additional:number):Promise<void> {const stat=await statfs(await this.o.artifacts.localPath(key),{bigint:true});if(stat.bavail*stat.bsize<BigInt(Math.ceil(additional))+64n*1024n*1024n)throw new AppError("DISK_FULL","创建工作副本所需磁盘空间不足");}
@@ -45,7 +47,7 @@ export class WorkspaceService {
           if(!Object.keys(expected).every(k=>fp[k as keyof FileFingerprint]===expected[k as keyof FileFingerprint]))throw new AppError("SOURCE_CHANGED","文件在预览后变化");
         }}await this.o.artifacts.promote(baseline);checkpoint=await this.snapshots.clone(baseline,undefined,signal);
         const imported=new Map(p.entries.map(e=>[e.relativePath,e]));for(const e of await this.o.artifacts.manifest(current.checkpointKey)){if(imported.has(e.relativePath)){if(e.kind==="directory"&&imported.get(e.relativePath)!.kind==="directory")continue;throw new AppError("FILE_CONFLICT","导入目录与现有工作区文件重名");}if(e.kind==="directory")await this.o.artifacts.directory(checkpoint,e.relativePath);else await this.o.artifacts.write(checkpoint,e.relativePath,this.o.artifacts.read(current.checkpointKey,e.relativePath));}
-        const next={...await this.snapshots.prepareCommit(current,checkpoint),baselineKey:baseline,sourceRoot:p.root,sourceLabel:basename(p.root)};
+        const next={...await this.snapshots.prepareCommit(current,checkpoint),baselineKey:baseline,sourceRoot:p.root,sourceIdentity:{device:p.device,inode:p.inode},sourceLabel:basename(p.root)};
         this.o.store.transaction(()=>{this.idle(n,sid,signal);this.snapshots.validate(n,current,signal);this.o.store.workspaces.save(n,next);});committed=true;await this.snapshots.discardOld(current);if(current.baselineKey!==current.checkpointKey)await this.o.artifacts.discard(current.baselineKey).catch(()=>{});else await this.o.artifacts.discard(current.checkpointKey).catch(()=>{});return workspaceView(next);
       }finally{if(!committed){await this.o.artifacts.discard(baseline).catch(()=>{});if(checkpoint)await this.o.artifacts.discard(checkpoint).catch(()=>{});}}
     });

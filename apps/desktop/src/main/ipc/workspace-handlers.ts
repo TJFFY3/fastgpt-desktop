@@ -1,12 +1,15 @@
-import { AppError, asAppError, type Namespace } from "../../../../../packages/shared/src/index";
+import { AppError, asAppError, type Namespace, type ExportSelection } from "../../../../../packages/shared/src/index";
+import { namespaceKey } from "../../../../../packages/storage/src/index";
 import { authorizeSender } from "../ipc";
 import type { WorkspaceService } from "../workspaces/workspace-service";
-import { workspaceInputs } from "./feature-inputs";
-export function registerWorkspaceHandlers(ipc:{handle(channel:string,listener:(event:any,raw:unknown)=>Promise<unknown>):void},options:{workspaces:WorkspaceService;principal:()=>Namespace;window:()=>Parameters<typeof authorizeSender>[1];devOrigin?:string}) {
+import { workspaceInputs,exportInputs } from "./feature-inputs";
+import type { ExportService } from "../workspaces/export-service";
+export function registerWorkspaceHandlers(ipc:{handle(channel:string,listener:(event:any,raw:unknown)=>Promise<unknown>):void},options:{workspaces:WorkspaceService;exports:ExportService;principal:()=>Namespace;window:()=>Parameters<typeof authorizeSender>[1];devOrigin?:string}) {
   for(const channel of Object.keys(workspaceInputs))ipc.handle(channel,async(event,raw)=>{
     try {authorizeSender(event,options.window(),options.devOrigin);const parsed=workspaceInputs[channel as keyof typeof workspaceInputs].safeParse(raw);if(!parsed.success)throw new AppError("INVALID_INPUT","请求参数无效");const v=parsed.data as {sessionId:string;grantId?:string;cursor?:string;path?:string;offset?:number;maxBytes?:number},n=options.principal(),service=options.workspaces;let data:unknown;
       switch(channel){case"workspaces:ensure":data=await service.ensure(n,v.sessionId);break;case"workspaces:preview":data=await service.previewSelection(n,v.sessionId);break;case"workspaces:import":data=await service.importSelection(n,v.sessionId,v.grantId!,new AbortController().signal);break;case"workspaces:list":data=await service.list(n,v.sessionId,v.cursor);break;case"workspaces:read":data=await service.read(n,v.sessionId,v.path!,v.offset!,v.maxBytes!);break;case"workspaces:diff":data=await service.diff(n,v.sessionId);break;}
       authorizeSender(event,options.window(),options.devOrigin);service.snapshots.check(n,v.sessionId);return {ok:true,data};
     }catch(e){const error=asAppError(e);return {ok:false,error:{code:error.code,message:error.safeMessage}};}
   });
+  for(const channel of Object.keys(exportInputs))ipc.handle(channel,async(event,raw)=>{try{authorizeSender(event,options.window(),options.devOrigin);const parsed=exportInputs[channel as keyof typeof exportInputs].safeParse(raw);if(!parsed.success)throw new AppError("INVALID_INPUT","请求参数无效");const n=options.principal(),v=parsed.data as {sessionId?:string;paths?:string[];token?:string;selections?:ExportSelection[];workspaceId?:string;id?:string;ids?:string[]},service=options.exports;let data:unknown;switch(channel){case"exports:preview":data=await service.preview(n,v.sessionId!,v.paths!);break;case"exports:apply":data=await service.apply(n,v.token!,v.selections!);break;case"exports:directory":data=await service.exportToChosenDirectory(n,v.sessionId!,v.paths!);break;case"exports:backups":data=await service.listBackups(n,v.workspaceId);break;case"exports:restore":data=await service.restoreBackup(n,v.id!);break;case"exports:remove":data=await service.removeBackups(n,v.ids!);break;}authorizeSender(event,options.window(),options.devOrigin);if(namespaceKey(n)!==namespaceKey(options.principal()))throw new AppError("PERMISSION_DENIED","当前身份已失效");return {ok:true,data};}catch(e){const error=asAppError(e);return {ok:false,error:{code:error.code,message:error.safeMessage}};}});
 }
