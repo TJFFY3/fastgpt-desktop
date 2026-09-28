@@ -1,4 +1,5 @@
 import { AppError } from "../../shared/src/index";
+export function normalizeTranscriptionEndpoint(baseUrl:string):URL{let url:URL;try{url=new URL(baseUrl);}catch{throw new AppError("INVALID_INPUT","请填写有效的转写 API 地址");}if(!["https:","http:"].includes(url.protocol)||url.username||url.password||url.search||url.hash)throw new AppError("INVALID_INPUT","转写地址仅支持无凭据和查询参数的 HTTP/HTTPS 地址");const path=url.pathname.replace(/\/+$/,"");url.pathname=path.endsWith("/audio/transcriptions")?path:path+"/audio/transcriptions";return url;}
 export function normalizeChatEndpoint(baseUrl: string): URL {
   let url: URL;
   try {

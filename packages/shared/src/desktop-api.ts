@@ -9,8 +9,9 @@ import type {
   SessionPatch,
   SessionRecord,
 } from "./types";
-import type { RunStartOptions, RunTimingSnapshot, AttachmentApi, WorkspaceApi, ApprovalApi, SandboxApi, ExportApi } from "./feature-types";
+import type { RunStartOptions, RunTimingSnapshot, AttachmentApi, WorkspaceApi, ApprovalApi, SandboxApi, ExportApi,SpeechApi } from "./feature-types";
 export interface DesktopApi {
+  speech:SpeechApi;
   exports:ExportApi;
   attachments:AttachmentApi;
   workspaces:WorkspaceApi;

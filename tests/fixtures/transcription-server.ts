@@ -1,0 +1,4 @@
+import { createServer,type ServerResponse } from "node:http";
+import type { AddressInfo } from "node:net";
+export const webmBytes=new Uint8Array([0x1a,0x45,0xdf,0xa3,1,2,3,4]);
+export async function startTranscriptionServer(handler:(res:ServerResponse)=>void= res=>{res.setHeader("Content-Type","application/json");res.end(JSON.stringify({text:"转写中文"}));}){const requests:{url:string;headers:Record<string,string|string[]|undefined>;bytes:Buffer}[]=[];const server=createServer(async(req,res)=>{const chunks:Buffer[]=[];for await(const chunk of req)chunks.push(Buffer.from(chunk));requests.push({url:req.url!,headers:req.headers,bytes:Buffer.concat(chunks)});handler(res);});await new Promise<void>(r=>server.listen(0,"127.0.0.1",r));return {baseUrl:`http://127.0.0.1:${(server.address()as AddressInfo).port}/v1`,requests,close:()=>new Promise<void>((r,e)=>{server.close(error=>error?e(error):r());server.closeAllConnections();})};}

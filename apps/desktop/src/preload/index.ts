@@ -11,6 +11,7 @@ async function invoke<T>(channel: string, input: unknown): Promise<T> {
   return result.data;
 }
 const api: DesktopApi = {
+  speech:{get:()=>invoke("speech:get",{}),save:(draft,apiKey)=>invoke("speech:save",{draft,...(apiKey===undefined?{}:{apiKey})}),beginCapture:sessionId=>invoke("speech:begin",{sessionId}),submit:audio=>invoke("speech:submit",audio),cancel:operationId=>invoke("speech:cancel",{operationId})},
   exports:{preview:(sessionId,paths)=>invoke("exports:preview",{sessionId,paths}),apply:(token,selections)=>invoke("exports:apply",{token,selections}),exportToChosenDirectory:(sessionId,paths)=>invoke("exports:directory",{sessionId,paths}),listBackups:workspaceId=>invoke("exports:backups",workspaceId?{workspaceId}:{}),restoreBackup:id=>invoke("exports:restore",{id}),removeBackups:ids=>invoke("exports:remove",{ids})},
   approvals:{decide:(id,decision)=>invoke("approvals:decide",{id,decision})},
   sandbox:{detect:()=>invoke("sandbox:detect",{}),prepareImage:()=>invoke("sandbox:prepare",{}),timing:(runId,callId)=>invoke("sandbox:timing",{runId,callId}),onImageProgress:listener=>{const handler=(_event:unknown,text:unknown)=>{if(typeof text==="string"&&text.length<=8192)listener(text);};ipcRenderer.on("sandbox:progress",handler);return()=>ipcRenderer.removeListener("sandbox:progress",handler);}},

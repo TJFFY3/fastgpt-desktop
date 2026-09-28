@@ -16,6 +16,7 @@ import { useSessionRuns } from "./hooks/useSessionRuns";
 import { useDrafts } from "./hooks/useDrafts";
 import { SandboxStatus } from "./components/SandboxStatus";
 import { WorkspacePanel } from "./components/WorkspacePanel";
+import { SpeechSettings } from "./components/SpeechSettings";
 const active = [
   "queued",
   "running",
@@ -41,6 +42,7 @@ export default function App() {
     [pendingStarts, setPendingStarts] = useState<Set<string>>(new Set());
   const [modelSwitching,setModelSwitching]=useState(false);
   const [workspaceOpen,setWorkspaceOpen]=useState(false);
+  const [speechSettings,setSpeechSettings]=useState(false);
   const sessionRuns=useSessionRuns(selectedId);
   const selectSession = useCallback((record: SessionRecord | null) => {
     initiallySelected.current = true;
@@ -263,6 +265,7 @@ export default function App() {
           <ModelPicker providers={providers} value={selected?.providerId ?? providerId} disabled={busy || !!selected?.archived} onChange={id=>void changeModel(id)} />
           <SandboxStatus/>
           <button onClick={()=>setWorkspaceOpen(true)}>工作区</button>
+          <button onClick={()=>setSpeechSettings(true)}>语音设置</button>
         </header>
         {(error || eventError || runtimeError) && (
           <div role="alert" className="error-banner">
@@ -324,6 +327,7 @@ export default function App() {
         />
       )}
       {workspaceOpen&&<WorkspacePanel key={selectedId??"none"} sessionId={selectedId} busy={busy} onClose={()=>setWorkspaceOpen(false)} onChanged={refresh}/>}
+      {speechSettings&&<SpeechSettings onClose={()=>setSpeechSettings(false)}/>}
     </div>
   );
 }

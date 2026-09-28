@@ -23,6 +23,7 @@ import { registerIpc } from "./ipc";
 import { createFeatureServices } from "./feature-services";
 import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
 import { registerWorkspaceHandlers } from "./ipc/workspace-handlers";
+import { registerSpeechHandlers } from "./ipc/speech-handlers";
 import { registerApprovalHandlers } from "./ipc/approval-handlers";
 import { registerWorkspaceTools } from "./tools/workspace-tools";
 protocol.registerSchemesAsPrivileged([
@@ -84,7 +85,7 @@ else
       let agents: AgentService;
       const principal = new PrincipalService((n) => agents.cancelNamespace(n));
       const window = await createWindow(join(__dirname, "../preload/index.js"));
-      const features=createFeatureServices({store,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id,
+      const features=createFeatureServices({store,secrets,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id,
         dockerExecutable:process.platform==="darwin"?[join(homedir(),".docker/bin/docker"),"/usr/local/bin/docker"].find(p=>existsSync(p))??"/usr/local/bin/docker":process.platform==="win32"?"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe":"/usr/bin/docker",
         imageDirectory:app.isPackaged?join(process.resourcesPath,"sandbox-image"):resolve(app.getAppPath(),"../../packages/sandbox/image"),persistEvent:(context,event)=>agents.emit(context,event),
         pickWorkspace:async()=>{const result=await dialog.showOpenDialog(window,{title:"选择工作目录（先预览，不会上传）",properties:["openDirectory"]});return result.canceled?null:result.filePaths[0]??null;},
@@ -139,6 +140,7 @@ else
         confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
       });
       registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,exports:features.exports,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
+      registerSpeechHandlers(ipcMain,{speech:features.speech,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
       registerApprovalHandlers(ipcMain,{approvals:features.approvals,sandbox:features.sandbox,store,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,dataDirectory:app.getPath("userData"),imagePreparation:features.imagePreparation});
       if (devUrl) await window.loadURL(devUrl);
       else {
@@ -151,6 +153,7 @@ else
         event.preventDefault();
         quitting = true;
         features.imagePreparation.controller?.abort();
+        features.speech.shutdown();
         void supervisor.shutdown().then(async()=>{await Promise.allSettled([features.sandbox.shutdown(),features.imagePreparation.promise??Promise.resolve()]);}).finally(() => {
           agents.dispose();
           features.exports.dispose();
