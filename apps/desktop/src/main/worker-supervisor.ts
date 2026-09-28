@@ -1,4 +1,5 @@
 import {
+  AppError,
   asAppError,
   workerReplySchema,
   type AgentEvent,
@@ -20,6 +21,8 @@ type State = {
   terminal: boolean;
   timer?: ReturnType<typeof setTimeout>;
   ended: Promise<void>;
+  toolsAbort:AbortController;
+  stopping:()=>void;
 };
 export class WorkerSupervisor implements Supervisor {
   private children = new Map<string, State>();
@@ -30,6 +33,7 @@ export class WorkerSupervisor implements Supervisor {
     onEvent: (event: AgentEvent) => Promise<void>,
     onTool: (call: ToolCall) => Promise<ToolResult>,
     onExit: () => Promise<void>,
+    onStopping?:()=>void,
   ) {
     const child = this.factory();
     let ended!: () => void,
@@ -38,6 +42,8 @@ export class WorkerSupervisor implements Supervisor {
         child,
         queue: Promise.resolve(),
         terminal: false,
+        toolsAbort:new AbortController(),
+        stopping:()=>{if(!state.toolsAbort.signal.aborted){state.toolsAbort.abort();onStopping?.();}},
         ended: new Promise((resolve) => {
           ended = resolve;
         }),
@@ -105,7 +111,9 @@ export class WorkerSupervisor implements Supervisor {
           } else {
             let result: ToolResult;
             try {
-              result = await onTool(message.call);
+              if(state.toolsAbort.signal.aborted)throw new AppError("CANCELLED","工具等待已取消");
+              let abort:()=>void=()=>{};
+              try {result=await Promise.race([onTool(message.call),new Promise<never>((_,reject)=>{abort=()=>reject(new AppError("CANCELLED","工具等待已取消"));state.toolsAbort.signal.addEventListener("abort",abort,{once:true});if(state.toolsAbort.signal.aborted)abort();})]);}finally{state.toolsAbort.signal.removeEventListener("abort",abort);}
             } catch (error) {
               const safe = asAppError(error);
               result = {
@@ -126,6 +134,7 @@ export class WorkerSupervisor implements Supervisor {
         });
     });
     child.on("exit", () => {
+      state.stopping();
       clearTimeout(state.timer);
       this.children.delete(input.runId);
       void state.queue

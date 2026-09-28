@@ -9,6 +9,7 @@ import {
   type RunInput,
   type ToolCall,
   type ToolResult,
+  type ToolContext,
 } from "../../../../packages/shared/src/index";
 import {
   activeStatuses,
@@ -20,6 +21,7 @@ import type { ProviderService } from "./provider-service";
 import { ToolGateway } from "./tool-gateway";
 import { RunClock } from "./run-clock";
 import { RunStartService, type ContextPreparer } from "./run-start-service";
+import type { ApprovalService } from "./tools/approval-service";
 export { modelHistory } from "./run-start-service";
 export interface Supervisor {
   start(
@@ -28,6 +30,7 @@ export interface Supervisor {
     onEvent: (event: AgentEvent) => Promise<void>,
     onTool: (call: ToolCall) => Promise<ToolResult>,
     onExit: () => Promise<void>,
+    onStopping?:()=>void,
   ): void;
   cancel(runId: string): void;
   shutdown(): Promise<void>;
@@ -40,9 +43,11 @@ export class AgentService {
       controller: AbortController;
       partial: string;
       error: string | null;
+      cancelRequested:boolean;
     }
   >();
   private revoked = new Set<string>();
+  private emitters=new Map<string,(event:AgentEvent,trusted?:boolean)=>Promise<void>>();
   private gateway: ToolGateway;
   private clock:RunClock;
   private starts:RunStartService;
@@ -54,13 +59,14 @@ export class AgentService {
     private principal: () => Namespace,
     private publish: (event: RunEvent) => void,
     prepareContext?:ContextPreparer,
+    approvals?:ApprovalService,
   ) {
-    this.gateway = new ToolGateway(store.runs, tools);
+    this.gateway = new ToolGateway(store.runs, tools,approvals);
     this.starts=new RunStartService(store,providers,principal,()=>tools.definitions(),prepareContext);
     this.clock=new RunClock((id,elapsed)=>{
       const state=this.running.get(id);if(state) store.runs.saveTiming(state.namespace,id,elapsed);
     },()=>performance.now(),(id)=>{
-      const state=this.running.get(id);state?.controller.abort();supervisor.cancel(id);
+      const state=this.running.get(id);if(state)state.cancelRequested=true;state?.controller.abort();supervisor.cancel(id);
     });
   }
   async start(n: Namespace, sessionId: string, text: string, options?:RunStartOptions) {
@@ -82,10 +88,11 @@ export class AgentService {
         controller: new AbortController(),
         partial: "",
         error: null as string | null,
+        cancelRequested:false,
       };
     this.running.set(run.id, state);
     this.clock.start(run.id);
-    const event = async (value: AgentEvent) => {
+    const event = async (value: AgentEvent,trusted=false) => {
       const persisted = this.store.transaction(() => {
         let messageId:string|undefined;
         const current = this.store.runs.get(n, run.id);
@@ -94,13 +101,13 @@ export class AgentService {
         if (
           state.controller.signal.aborted &&
           value.type !== "status" &&
-          value.type !== "error"
+          value.type !== "error"&&!(trusted&&(value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked"))
         )
           return;
         if (value.type === "status") {
           const status =
             state.controller.signal.aborted && value.status === "completed"
-              ? "cancelled"
+              ? state.cancelRequested?"cancelled":"interrupted"
               : value.status;
           if(activeStatuses.includes(status)) this.clock.checkpoint(run.id);
           else this.clock.finish(run.id);
@@ -117,7 +124,8 @@ export class AgentService {
                 {runId:run.id},
               );
             state.partial = "";
-            this.running.delete(run.id);
+              this.running.delete(run.id);
+              this.emitters.delete(run.id);
           }
         } else if (value.type === "text_delta") state.partial += value.text;
         else if (value.type === "assistant_message") {
@@ -140,13 +148,14 @@ export class AgentService {
       )
         this.publish(persisted);
     };
+    this.emitters.set(run.id,event);
     const onExit = async () => {
       const current = this.store.runs.get(n, run.id);
       if (activeStatuses.includes(current.status)) {
         state.error = "WORKER_EXITED";
         await event({
           type: "status",
-          status: state.controller.signal.aborted ? "cancelled" : "interrupted",
+          status: state.cancelRequested ? "cancelled" : "interrupted",
         });
       }
     };
@@ -171,6 +180,7 @@ export class AgentService {
           );
         },
         onExit,
+        ()=>state.controller.abort(),
       );
     } catch {
       state.error = "WORKER_START_FAILED";
@@ -182,10 +192,17 @@ export class AgentService {
     }
     return this.store.runs.get(n, run.id);
   }
+  async emit(context:ToolContext,value:AgentEvent):Promise<void>{
+    const n=context.namespace,run=this.store.runs.get(n,context.runId),state=this.running.get(run.id),emitter=this.emitters.get(run.id);
+    const terminalCleanup=value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked";
+    if(run.sessionId!==context.sessionId||!activeStatuses.includes(run.status)||!state||!emitter||state.controller.signal.aborted&&!terminalCleanup||this.revoked.has(namespaceKey(n))||namespaceKey(this.principal())!==namespaceKey(n))throw new AppError("PERMISSION_DENIED","当前运行不允许发布工具事件");
+    await emitter(value,true);
+  }
   async cancel(n: Namespace, runId: string) {
     const run = this.store.runs.get(n, runId);
     if (!activeStatuses.includes(run.status)) return;
     const state = this.running.get(runId);
+    if(state)state.cancelRequested=true;
     state?.controller.abort();
     this.clock.checkpoint(runId);
     if (run.status !== "cancelling") {

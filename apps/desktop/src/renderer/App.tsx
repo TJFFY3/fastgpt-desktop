@@ -14,6 +14,7 @@ import { Composer } from "./components/Composer";
 import { ModelPicker } from "./components/ModelPicker";
 import { useSessionRuns } from "./hooks/useSessionRuns";
 import { useDrafts } from "./hooks/useDrafts";
+import { SandboxStatus } from "./components/SandboxStatus";
 const active = [
   "queued",
   "running",
@@ -258,6 +259,7 @@ export default function App() {
             </span>
           </div>
           <ModelPicker providers={providers} value={selected?.providerId ?? providerId} disabled={busy || !!selected?.archived} onChange={id=>void changeModel(id)} />
+          <SandboxStatus/>
         </header>
         {(error || eventError || runtimeError) && (
           <div role="alert" className="error-banner">
@@ -283,6 +285,7 @@ export default function App() {
           runs={sessionRuns.runs}
           eventsByRun={sessionRuns.eventsByRun}
           onLoadRun={id=>void sessionRuns.loadEvents(id).catch(e=>fail(String(e)))}
+          onDecide={(id,decision)=>window.desktop.approvals.decide(id,decision)}
         />
         <div className="chat-bottom">
           <Composer

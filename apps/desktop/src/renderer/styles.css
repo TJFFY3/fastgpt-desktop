@@ -290,7 +290,19 @@ summary:focus-visible {
   font-size: 15px;
   margin: 0 0 6px;
   font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
+.chat-header > div:first-child {min-width:120px; flex:1;}
+.sandbox-status {position:relative; flex:none; margin-left:18px; font-size:12px; color:#65748c;}
+.sandbox-status > summary {cursor:pointer; white-space:nowrap;}
+.sandbox-popup {position:absolute; z-index:20; top:28px; right:0; width:min(380px,70vw); max-height:65vh; overflow:auto; padding:16px; border:1px solid #e3e8f1; border-radius:12px; background:white; box-shadow:0 12px 35px #1d31531a; line-height:1.7;}
+.sandbox-popup p {margin:0 0 12px;}
+.sandbox-popup pre {font:11px/1.6 ui-monospace,monospace; white-space:pre-wrap; overflow-wrap:anywhere; max-height:240px; overflow:auto;}
+.sandbox-popup small {display:block; margin-top:10px; color:#8d98a9;}
+.trace-approval button {margin:6px 10px 0 0; padding:6px 12px; border:1px solid #dce4f2; border-radius:7px; background:white; cursor:pointer;}
+.trace-approval[data-state=pending] {border-left:3px solid #4673db; padding-left:12px;}
 .workspace-label {
   font-size: 11px;
   color: #8d98a9;

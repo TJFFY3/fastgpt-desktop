@@ -7,8 +7,9 @@ import {
   session,
   dialog,
 } from "electron";
-import { join, isAbsolute } from "node:path";
-import { mkdirSync } from "node:fs";
+import { join, isAbsolute, resolve } from "node:path";
+import { mkdirSync, existsSync } from "node:fs";
+import { homedir } from "node:os";
 import { openStore } from "../../../../packages/storage/src/index";
 import { SecretStore } from "./credentials";
 import { ProviderService } from "./provider-service";
@@ -22,6 +23,8 @@ import { registerIpc } from "./ipc";
 import { createFeatureServices } from "./feature-services";
 import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
 import { registerWorkspaceHandlers } from "./ipc/workspace-handlers";
+import { registerApprovalHandlers } from "./ipc/approval-handlers";
+import { registerWorkspaceTools } from "./tools/workspace-tools";
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -82,6 +85,8 @@ else
       const principal = new PrincipalService((n) => agents.cancelNamespace(n));
       const window = await createWindow(join(__dirname, "../preload/index.js"));
       const features=createFeatureServices({store,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id,
+        dockerExecutable:process.platform==="darwin"?[join(homedir(),".docker/bin/docker"),"/usr/local/bin/docker"].find(p=>existsSync(p))??"/usr/local/bin/docker":process.platform==="win32"?"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe":"/usr/bin/docker",
+        imageDirectory:app.isPackaged?join(process.resourcesPath,"sandbox-image"):resolve(app.getAppPath(),"../../packages/sandbox/image"),persistEvent:(context,event)=>agents.emit(context,event),
         pickWorkspace:async()=>{const result=await dialog.showOpenDialog(window,{title:"选择工作目录（先预览，不会上传）",properties:["openDirectory"]});return result.canceled?null:result.filePaths[0]??null;},
       });
       app.on("second-instance", () => {
@@ -90,16 +95,18 @@ else
         window.show();
         window.focus();
       });
+      const tools=createBuiltinTools();registerWorkspaceTools(tools,{workspace:features.workspaces,sandbox:features.sandbox,approvals:features.approvals,store,persistEvent:(context,event)=>agents.emit(context,event)});
       agents = new AgentService(
         store,
         providers,
         supervisor,
-        createBuiltinTools(),
+        tools,
         () => principal.current(),
         (e) => {
           if (!window.isDestroyed()) window.webContents.send("run:event", e);
         },
         (n,request,profile,tools)=>features.context.assembleContext(n,request.sessionId,request.text,request.attachmentIds,profile,tools),
+        features.approvals,
       );
       const devUrl = __DEV_BUILD__
         ? process.env.ELECTRON_RENDERER_URL
@@ -131,6 +138,7 @@ else
         confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
       });
       registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
+      registerApprovalHandlers(ipcMain,{approvals:features.approvals,sandbox:features.sandbox,store,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,dataDirectory:app.getPath("userData"),imagePreparation:features.imagePreparation});
       if (devUrl) await window.loadURL(devUrl);
       else {
         await installProtocol(join(__dirname, "../renderer"));
@@ -141,7 +149,9 @@ else
         if (quitting) return;
         event.preventDefault();
         quitting = true;
-        void supervisor.shutdown().finally(() => {
+        features.imagePreparation.controller?.abort();
+        void supervisor.shutdown().then(async()=>{await Promise.allSettled([features.sandbox.shutdown(),features.imagePreparation.promise??Promise.resolve()]);}).finally(() => {
+          agents.dispose();
           secrets.clearSessionOnly();
           store.close();
           app.quit();

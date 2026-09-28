@@ -4,6 +4,7 @@ import type {
   RunEvent,
   RunRecord,
   AttachmentView,
+  ApprovalDecision,
 } from "../../../../../packages/shared/src/index";
 import { RunTrace } from "./RunTrace";
 import { AttachmentList } from "./AttachmentList";
@@ -15,6 +16,7 @@ export function ChatView({
   onSettings,
   runs=[],eventsByRun=new Map(),onLoadRun,
   attachments=[],
+  onDecide,
 }: {
   messages: MessageRecord[];
   events: RunEvent[];
@@ -23,6 +25,7 @@ export function ChatView({
   onSettings(): void;
   runs?:RunRecord[];eventsByRun?:Map<string,RunEvent[]>;onLoadRun?(id:string):void;
   attachments?:AttachmentView[];
+  onDecide?(id:string,decision:ApprovalDecision):Promise<void>;
 }) {
   const bottom = useRef<HTMLDivElement>(null);
   const known=new Set(messages.map(m=>m.id));
@@ -51,7 +54,7 @@ export function ChatView({
   }, [messages, partial, events.length, runs.length]);
   const lastIndex=new Map<string,number>();displayed.forEach((m,i)=>{if(m.runId) lastIndex.set(m.runId,i);});
   const liveRunId=events[0]?.runId;
-  const trace=(r:RunRecord)=><RunTrace key={r.id} run={r} events={eventsByRun.get(r.id) ?? (liveRunId===r.id?events:[])} latest={r.id===runs.at(-1)?.id} onOpen={()=>onLoadRun?.(r.id)} />;
+  const trace=(r:RunRecord)=><RunTrace key={r.id} run={r} events={eventsByRun.get(r.id) ?? (liveRunId===r.id?events:[])} latest={r.id===runs.at(-1)?.id} onOpen={()=>onLoadRun?.(r.id)} onDecide={onDecide}/>;
   return (
     <div className="chat-scroll">
       {!displayed.length && !partial ? (

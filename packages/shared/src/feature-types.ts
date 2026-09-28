@@ -74,4 +74,4 @@ export interface SpeechApi {
   submit(audio: AudioSubmission): Promise<{ operationId: string; text: string }>;
   cancel(operationId: string): Promise<void>;
 }
-export interface SandboxApi { detect(): Promise<SandboxAvailability>; prepareImage(): Promise<{ imageId: string }> }
+export interface SandboxApi { detect(): Promise<SandboxAvailability>; prepareImage(): Promise<{ imageId: string }>; timing(runId:string,callId:string):Promise<{elapsedMs:number;active:boolean}>;onImageProgress(listener:(text:string)=>void):()=>void }

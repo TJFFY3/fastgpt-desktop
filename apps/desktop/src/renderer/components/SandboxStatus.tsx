@@ -1,0 +1,7 @@
+import { useEffect, useRef, useState } from "react";
+import type { SandboxAvailability } from "../../../../../packages/shared/src/index";
+export function SandboxStatus(){const panel=useRef<HTMLDetailsElement>(null),[status,setStatus]=useState<SandboxAvailability|null>(null),[preparing,setPreparing]=useState(false),[progress,setProgress]=useState(""),[error,setError]=useState("");
+  useEffect(()=>{let alive=true;void window.desktop.sandbox.detect().then(v=>{if(alive)setStatus(v);}).catch(e=>{if(alive)setError(String(e));});const unsubscribe=window.desktop.sandbox.onImageProgress(text=>{if(alive)setProgress(current=>(current+text).slice(-65536));});return()=>{alive=false;unsubscribe();};},[]);
+  const prepare=async()=>{if(preparing)return;setPreparing(true);setError("");setProgress("");try{await window.desktop.sandbox.prepareImage();setStatus(await window.desktop.sandbox.detect());if(panel.current)panel.current.open=false;}catch(e){setError(String(e));}finally{setPreparing(false);}};
+  return <details ref={panel} className="sandbox-status"><summary><span data-testid="sandbox-state">{preparing?"沙箱准备中":status?.imageReady?"沙箱已就绪":status?.available?"沙箱待准备":"沙箱不可用"}</span></summary><div className="sandbox-popup"><p>仅在本机 Docker 内执行。准备镜像会下载应用维护的运行环境；聊天命令不会自动安装或拉取镜像。</p><button disabled={preparing||status?.available===false} onClick={()=>void prepare()}>准备沙箱</button>{error&&<p role="alert">{error}</p>}{status?.reason&&!preparing&&<p>{status.reason}</p>}{progress&&<><small>显示最近 64 KiB 的构建进度</small><pre aria-label="镜像准备进度">{progress}</pre></>}</div></details>;
+}
