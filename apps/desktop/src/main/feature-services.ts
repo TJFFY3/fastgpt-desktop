@@ -20,6 +20,6 @@ export function createFeatureServices(options:{store:Store;secrets:SecretStore;d
   const workspaces=new WorkspaceService({...options,files,artifacts,grants,snapshots,pick:options.pickWorkspace,credentialRoots:[options.dataDirectory]});
   const approvals=new ApprovalService(options),client=new DockerClient(options.dockerExecutable),images=new ImageService({client,assetDirectory:options.imageDirectory,stateDirectory:join(options.dataDirectory,"sandbox/image")}),sandbox=new DockerSandboxProvider({client,images,files:artifacts,stateDirectory:join(options.dataDirectory,"sandbox/owners")});const imagePreparation:ImagePreparation={controller:null,promise:null};
   const exports=new ExportService({workspace:workspaces,directory:join(options.dataDirectory,"backups"),principal:options.principal,pickDirectory:options.pickWorkspace,confirm:options.confirmExport,credentialRoots:[options.dataDirectory]});
-  const speech=new TranscriptionService(options);
+  const speech=new TranscriptionService({...options,assertSession:(n,sid)=>snapshots.check(n,sid)});
   return {files,artifacts,grants,snapshots,attachments,context,workspaces,exports,speech,approvals,sandbox,imagePreparation};
 }

@@ -23,12 +23,14 @@ type Operation={input:SandboxExecution;abort:AbortController;promise:Promise<San
 export class DockerSandboxProvider implements SandboxProvider {
   private queue=new ExecutionQueue();private resources:OwnedResources;private operations=new Map<string,Operation>();private closed=false;
   private timings=new Map<string,{started:number;elapsedMs:number;active:boolean}>();
+  private recoveryPending=false;
   constructor(private o:ProviderOptions){this.resources=new OwnedResources(o.stateDirectory);}
   private async engine():Promise<string>{await this.o.client.assertLocal();const result=await this.o.client.run(["info","--format","{{json .}}"]);let info:any;try{info=JSON.parse(result.stdout);}catch{throw new AppError("SANDBOX_UNAVAILABLE","容器引擎信息无效");}assertCapabilities(info);if(result.code!==0||typeof info.ID!=="string"||!info.ID.length||info.ID.length>256)throw new AppError("SANDBOX_UNAVAILABLE","无法确定容器引擎归属");return info.ID;}
-  async detect():Promise<SandboxAvailability>{try{await this.engine();const imageReady=!!await this.o.images.getReadyImage();return {available:true,reason:imageReady?null:"IMAGE_NOT_READY",imageReady};}catch(e){return {available:false,reason:e instanceof AppError?e.code:"SANDBOX_UNAVAILABLE",imageReady:false};}}
+  async detect():Promise<SandboxAvailability>{if(this.recoveryPending)return {available:false,reason:"RESOURCE_CLEANUP_PENDING",imageReady:false};try{await this.engine();const imageReady=!!await this.o.images.getReadyImage();return {available:true,reason:imageReady?null:"IMAGE_NOT_READY",imageReady};}catch(e){return {available:false,reason:e instanceof AppError?e.code:"SANDBOX_UNAVAILABLE",imageReady:false};}}
   async prepareImage(signal:AbortSignal,progress:(text:string)=>void):Promise<{imageId:string}>{if(this.closed)throw new AppError("CANCELLED","沙箱已关闭");await this.engine();return this.o.images.prepare(signal,progress);}
   timing(runId:string,callId:string):{elapsedMs:number;active:boolean}{const t=this.timings.get(`${runId}:${callId}`);return t?{elapsedMs:t.active?Math.max(t.elapsedMs,performance.now()-t.started):t.elapsedMs,active:t.active}:{elapsedMs:0,active:false};}
   async execute(input:SandboxExecution):Promise<SandboxResult>{
+    if(this.recoveryPending)throw new AppError("RESOURCE_CLEANUP_PENDING","旧沙箱归属尚未核验，禁止启动新命令");
     if(this.closed||input.signal.aborted)return {reason:"cancelled",exitCode:null,elapsedMs:0,truncated:false,snapshotKey:null};
     if(!input.command.trim()||Buffer.byteLength(input.command)>16384||input.command.includes("\0")||Buffer.byteLength(input.cwd)>1024)throw new AppError("INVALID_INPUT","命令或相对目录无效");if(input.cwd!==".")sandboxPath(input.cwd);
     const key=`${input.owner.runId}:${input.owner.callId}`;if(this.operations.has(key))throw new AppError("RUN_ACTIVE","命令调用已在执行");
@@ -63,6 +65,7 @@ export class DockerSandboxProvider implements SandboxProvider {
     }return {exitCode,reason,elapsedMs,truncated,snapshotKey};
   }
   async cancel(runId:string):Promise<void>{const matching=[...this.operations.values()].filter(o=>o.input.owner.runId===runId);for(const op of matching)op.abort.abort();await Promise.allSettled(matching.map(o=>o.promise));}
-  async cleanupOwned():Promise<void>{const engine=await this.engine();for(const record of await this.resources.list())if(![...this.operations.values()].some(o=>o.input.owner.runId===record.owner.runId&&o.input.owner.callId===record.owner.callId))await this.resources.cleanup(this.o.client,record,engine);}
+  async stopSession(namespaceKey:string,sessionId:string):Promise<void>{const matching=[...this.operations.values()].filter(op=>op.input.owner.namespaceKey===namespaceKey&&op.input.owner.sessionId===sessionId);for(const op of matching)op.abort.abort();await Promise.allSettled(matching.map(op=>op.promise));const records=(await this.resources.list()).filter(r=>r.owner.namespaceKey===namespaceKey&&r.owner.sessionId===sessionId);if(!records.length)return;const engine=await this.engine();for(const record of records)if(!await this.resources.cleanup(this.o.client,record,engine)){this.recoveryPending=true;throw new AppError("RESOURCE_CLEANUP_PENDING","旧沙箱未确认停止，保留会话和归属记录");}}
+  async cleanupOwned():Promise<void>{const records=(await this.resources.list()).filter(record=>![...this.operations.values()].some(o=>o.input.owner.runId===record.owner.runId&&o.input.owner.callId===record.owner.callId));if(!records.length){this.recoveryPending=false;return;}try{const engine=await this.engine();let pending=false;for(const record of records)if(!await this.resources.cleanup(this.o.client,record,engine))pending=true;this.recoveryPending=pending;}catch(e){this.recoveryPending=true;throw e;}}
   async shutdown():Promise<void>{this.closed=true;this.queue.close();const operations=[...this.operations.values()];for(const op of operations)op.abort.abort();await Promise.allSettled(operations.map(o=>o.promise));await this.cleanupOwned().catch(()=>{});}
 }

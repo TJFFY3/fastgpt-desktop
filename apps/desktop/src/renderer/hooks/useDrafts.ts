@@ -20,6 +20,6 @@ export function useDrafts(sessionId:string|null,onFilesChange:()=>Promise<void>)
     pick:()=>sessionId?operation(sessionId,()=>window.desktop.attachments.pick(sessionId)):Promise.resolve(),
     drop:(files:File[])=>sessionId?operation(sessionId,()=>window.desktop.attachments.importDropped(sessionId,files)):Promise.resolve(),
     remove:(id:string)=>sessionId?operation(sessionId,()=>window.desktop.attachments.removeDraft(id)):Promise.resolve(),
-    sent:async(sid:string,text:string)=>{change(sid,d=>({...d,text:d.text.trim()===text?"":d.text}));await refresh(sid);},
+    sent:async(sid:string,text:string,attachmentIds:string[])=>{const consumed=new Set(attachmentIds);change(sid,d=>({...d,text:d.text.trim()===text?"":d.text,files:d.files.map(file=>consumed.has(file.id)?{...file,state:"sent"}:file)}));await refresh(sid);},
   };
 }

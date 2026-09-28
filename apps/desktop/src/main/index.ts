@@ -26,6 +26,7 @@ import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
 import { registerWorkspaceHandlers } from "./ipc/workspace-handlers";
 import { registerSpeechHandlers } from "./ipc/speech-handlers";
 import { MediaPermissionService } from "./speech/media-permissions";
+import { SessionLifecycle } from "./session-lifecycle";
 import { registerApprovalHandlers } from "./ipc/approval-handlers";
 import { registerWorkspaceTools } from "./tools/workspace-tools";
 protocol.registerSchemesAsPrivileged([
@@ -59,7 +60,6 @@ else
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
       const store = openStore(join(app.getPath("userData"), "fastgpt.sqlite"));
-      store.runs.recoverInterrupted();
       const secrets = new SecretStore(store.credentials, {
         isAvailable: () =>
           __TEST_BUILD__
@@ -86,7 +86,8 @@ else
         }),
       );
       let agents: AgentService;
-      const principal = new PrincipalService((n) => agents.cancelNamespace(n));
+      let lifecycle:SessionLifecycle;
+      const principal = new PrincipalService((n) => lifecycle.revokeNamespace(n));
       const window = await createWindow(join(__dirname, "../preload/index.js"));
       const features=createFeatureServices({store,secrets,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id,
         dockerExecutable:process.platform==="darwin"?[join(homedir(),".docker/bin/docker"),"/usr/local/bin/docker"].find(p=>existsSync(p))??"/usr/local/bin/docker":process.platform==="win32"?"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe":"/usr/bin/docker",
@@ -118,6 +119,8 @@ else
         : undefined;
       const devOrigin = devUrl ? new URL(devUrl).origin : undefined;
       const media=new MediaPermissionService({speech:features.speech,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,consent:()=>__TEST_BUILD__&&process.env.FASTGPT_DESKTOP_TEST_FAKE_AUDIO==="1"?Promise.resolve(true):process.platform==="darwin"?systemPreferences.askForMediaAccess("microphone"):Promise.resolve(true)});
+      lifecycle=new SessionLifecycle({store,agents,supervisor,features,media,principal:()=>principal.current(),ownsInstance:()=>app.hasSingleInstanceLock()});
+      await lifecycle.recover();
       session.defaultSession.setPermissionCheckHandler((wc,permission,origin,details)=>media.check(wc,permission,origin,details));
       session.defaultSession.setPermissionRequestHandler((wc,permission,callback,details)=>media.request(wc,permission,callback,details));
       // A bounded test-only delay reproduces asynchronous keyring/start races.
@@ -134,6 +137,7 @@ else
         store,
         providers,
         agents,
+        lifecycle,
         principal: () => principal.current(),
         window: () => window.webContents,
         devOrigin,
@@ -158,10 +162,7 @@ else
         if (quitting) return;
         event.preventDefault();
         quitting = true;
-        features.imagePreparation.controller?.abort();
-        features.speech.shutdown();
-        media.shutdown();
-        void supervisor.shutdown().then(async()=>{await Promise.allSettled([features.sandbox.shutdown(),features.imagePreparation.promise??Promise.resolve()]);}).finally(() => {
+        void lifecycle.shutdown().catch(()=>{console.error("Owned resource cleanup remains pending; retry records retained.");}).finally(() => {
           agents.dispose();
           features.exports.dispose();
           secrets.clearSessionOnly();

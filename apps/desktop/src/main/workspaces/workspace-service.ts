@@ -18,6 +18,8 @@ export class WorkspaceService {
   readonly files:SafeFileOps;
   private previews=new Map<string,PreviewData>();private checkouts=new Map<string,Checkout>();
   constructor(private o:Options) {this.files=o.files;this.snapshots=o.snapshots??new WorkspaceSnapshots(o.store,o.artifacts,o.principal);}
+  revokeSession(n:Namespace,sid:string):void{for(const [id,p]of this.previews)if(p.namespaceKey===namespaceKey(n)&&p.sessionId===sid)this.previews.delete(id);this.o.grants.revokeSession(n,sid);}
+  async discardSessionCheckouts(n:Namespace,sid:string):Promise<void>{for(const [key,c]of this.checkouts)if(c.namespaceKey===namespaceKey(n)&&c.sessionId===sid){this.checkouts.delete(key);await this.o.artifacts.discard(key).catch(()=>{});}}
   assertIdle(n:Namespace,sid:string):void{this.idle(n,sid);}
   private idle(n:Namespace,sid:string,signal?:AbortSignal):void {this.snapshots.check(n,sid,signal);if(this.o.store.runs.list(n,sid).some(r=>activeStatuses.includes(r.status)))throw new AppError("RUN_ACTIVE","运行期间不能重新导入工作区");if([...this.checkouts.values()].some(c=>c.namespaceKey===namespaceKey(n)&&c.sessionId===sid))throw new AppError("WORKSPACE_BUSY","工作区已有未完成的操作");}
   private current(n:Namespace,sid:string):WorkspaceRecord {this.snapshots.check(n,sid);const w=this.o.store.workspaces.getForSession(n,sid);if(!w)throw new AppError("NOT_FOUND","工作区尚未创建");return w;}

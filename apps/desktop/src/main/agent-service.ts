@@ -46,7 +46,11 @@ export class AgentService {
       cancelRequested:boolean;
     }
   >();
-  private revoked = new Set<string>();
+  private epochs = new Map<string,number>();private disposed=false;private closed=false;
+  private sessionGuard?:(n:Namespace,sid:string)=>void;
+  private resourceStop?:(runId:string)=>Promise<void>;
+  configureLifecycle(guard:(n:Namespace,sid:string)=>void,stop:(runId:string)=>Promise<void>):void{if(this.sessionGuard)throw new AppError("INVALID_INPUT","运行生命周期已配置");this.sessionGuard=guard;this.resourceStop=stop;}
+  beginShutdown():void{this.closed=true;}
   private emitters=new Map<string,(event:AgentEvent,trusted?:boolean)=>Promise<void>>();
   private gateway: ToolGateway;
   private clock:RunClock;
@@ -70,18 +74,21 @@ export class AgentService {
     });
   }
   async start(n: Namespace, sessionId: string, text: string, options?:RunStartOptions) {
+    if(this.closed)throw new AppError("CANCELLED","应用正在退出");
+    this.sessionGuard?.(n,sessionId);const epoch=this.epochs.get(namespaceKey(n))??0;
     const request=runStartSchema.parse({sessionId,text,...(options ?? {attachmentIds:[]})});
     if (
-      this.revoked.has(namespaceKey(n)) ||
+      this.closed ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
     const prepared=await this.starts.prepare(n,request);
     if (
-      this.revoked.has(namespaceKey(n)) ||
+      this.closed || (this.epochs.get(namespaceKey(n))??0)!==epoch ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
+    this.sessionGuard?.(n,sessionId);
     const run = prepared.commit(),
       state = {
         namespace: n,
@@ -93,6 +100,7 @@ export class AgentService {
     this.running.set(run.id, state);
     this.clock.start(run.id);
     const event = async (value: AgentEvent,trusted=false) => {
+      if(this.disposed)return;
       const persisted = this.store.transaction(() => {
         let messageId:string|undefined;
         const current = this.store.runs.get(n, run.id);
@@ -143,13 +151,16 @@ export class AgentService {
       });
       if (
         persisted &&
-        !this.revoked.has(namespaceKey(n)) &&
+        !this.closed &&
         namespaceKey(this.principal()) === namespaceKey(n)
       )
         this.publish(persisted);
     };
     this.emitters.set(run.id,event);
     const onExit = async () => {
+      if(this.disposed)return;
+      await this.resourceStop?.(run.id);
+      if(this.disposed)return;
       const current = this.store.runs.get(n, run.id);
       if (activeStatuses.includes(current.status)) {
         state.error = "WORKER_EXITED";
@@ -195,7 +206,7 @@ export class AgentService {
   async emit(context:ToolContext,value:AgentEvent):Promise<void>{
     const n=context.namespace,run=this.store.runs.get(n,context.runId),state=this.running.get(run.id),emitter=this.emitters.get(run.id);
     const terminalCleanup=value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked";
-    if(run.sessionId!==context.sessionId||!activeStatuses.includes(run.status)||!state||!emitter||state.controller.signal.aborted&&!terminalCleanup||this.revoked.has(namespaceKey(n))||namespaceKey(this.principal())!==namespaceKey(n))throw new AppError("PERMISSION_DENIED","当前运行不允许发布工具事件");
+    if(run.sessionId!==context.sessionId||!activeStatuses.includes(run.status)||!state||!emitter||state.controller.signal.aborted&&!terminalCleanup||this.disposed||namespaceKey(this.principal())!==namespaceKey(n))throw new AppError("PERMISSION_DENIED","当前运行不允许发布工具事件");
     await emitter(value,true);
   }
   async cancel(n: Namespace, runId: string) {
@@ -216,7 +227,7 @@ export class AgentService {
     this.supervisor.cancel(runId);
   }
   async cancelNamespace(n: Namespace) {
-    this.revoked.add(namespaceKey(n));
+    this.epochs.set(namespaceKey(n),(this.epochs.get(namespaceKey(n))??0)+1);
     await Promise.all(
       [...this.running.entries()]
         .filter(([, s]) => namespaceKey(s.namespace) === namespaceKey(n))
@@ -227,5 +238,5 @@ export class AgentService {
     const run=this.store.runs.get(n,runId),active=activeStatuses.includes(run.status);
     return {runId,active,elapsedMs:active && this.running.has(runId)?this.clock.elapsed(runId):run.elapsedMs};
   }
-  dispose():void {this.clock.dispose();}
+  dispose():void {this.disposed=true;this.closed=true;this.clock.dispose();}
 }

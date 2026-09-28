@@ -4,12 +4,19 @@ import { namespaceKey, type Store } from "../../../../../packages/storage/src/in
 import type { ArtifactStore } from "./artifact-store";
 export class WorkspaceSnapshots {
   private queues=new Map<string,Promise<unknown>>();
+  private retired=new Set<string>();private closed=false;
   constructor(readonly store:Store,readonly artifacts:ArtifactStore,private principal:()=>Namespace) {}
   check(n:Namespace,sid:string,signal?:AbortSignal):void {
+    if(this.closed||this.retired.has(namespaceKey(n)+sid))throw new AppError("CANCELLED","会话资源正在关闭，请等待清理或重试删除");
     if(namespaceKey(n)!==namespaceKey(this.principal())) throw new AppError("PERMISSION_DENIED","当前身份已失效");
     if(signal?.aborted) throw new AppError("CANCELLED","操作已取消");
     this.store.sessions.get(n,sid);
   }
+  retire(n:Namespace,sid:string):void{this.retired.add(namespaceKey(n)+sid);}
+  resume(n:Namespace,sid:string):void{this.retired.delete(namespaceKey(n)+sid);}
+  close():void{this.closed=true;}
+  assertStartAllowed(n:Namespace,sid:string):void{this.check(n,sid);if(this.queues.has(namespaceKey(n)+sid))throw new AppError("WORKSPACE_BUSY","文件操作尚未完成");}
+  async drain(n?:Namespace,sid?:string):Promise<void>{const work=n&&sid?[this.queues.get(namespaceKey(n)+sid)]:[...this.queues.values()];await Promise.allSettled(work.filter((p):p is Promise<unknown>=>!!p));}
   async locked<T>(n:Namespace,sid:string,operation:()=>Promise<T>):Promise<T> {
     const key=namespaceKey(n)+sid,before=this.queues.get(key)??Promise.resolve(),next=before.catch(()=>{}).then(operation);this.queues.set(key,next);
     try{return await next;}finally{if(this.queues.get(key)===next)this.queues.delete(key);}

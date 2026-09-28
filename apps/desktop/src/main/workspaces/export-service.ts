@@ -18,9 +18,11 @@ const equal=(a:FileFingerprint|null,b:FileFingerprint|null)=>a===null?b===null:b
 const sameBytes=(a:FileFingerprint|null,b:{sha256:string;size:number}|null)=>a===null?b===null:b!==null&&a.sha256===b.sha256&&a.size===b.size;
 const result=(path:string,status:ExportResult["status"],backupId:string|null=null,errorCode:string|null=null):ExportResult=>({path,status,backupId,errorCode});
 export class ExportService {
-  private tokens=new Map<string,Token>();private db?:DatabaseSync;private initializing?:Promise<DatabaseSync>;private quota:number;
+  private tokens=new Map<string,Token>();private db?:DatabaseSync;private initializing?:Promise<DatabaseSync>;private quota:number;private closed=false;
   constructor(private o:ExportOptions){this.quota=o.maxBackupBytes??1024**3;if(!Number.isSafeInteger(this.quota)||this.quota<0||this.quota>1024**3)throw new AppError("INVALID_INPUT","备份上限不得超过 1 GiB");}
-  private principal(n:Namespace):void{if(namespaceKey(n)!==namespaceKey(this.o.principal()))throw new AppError("PERMISSION_DENIED","当前身份已失效");}
+  private principal(n:Namespace):void{if(this.closed)throw new AppError("CANCELLED","文件导出服务已关闭");if(namespaceKey(n)!==namespaceKey(this.o.principal()))throw new AppError("PERMISSION_DENIED","当前身份已失效");}
+  revokeSession(n:Namespace,sid:string):void{for(const [id,t]of this.tokens)if(t.n===namespaceKey(n)&&t.w.sessionId===sid)this.tokens.delete(id);}
+  shutdown():void{this.closed=true;this.tokens.clear();}
   private current(n:Namespace,sid:string):WorkspaceRecord{this.principal(n);this.o.workspace.assertIdle(n,sid);const w=this.o.workspace.snapshots.store.workspaces.getForSession(n,sid);if(!w)throw new AppError("NOT_FOUND","工作区未创建");return w;}
   private validate(n:Namespace,w:WorkspaceRecord):void{this.current(n,w.sessionId);this.o.workspace.snapshots.validate(n,w);}
   private paths(paths:string[]):string[]{if(!Array.isArray(paths)||!paths.length||paths.length>1000)throw new AppError("INVALID_INPUT","请选择 1–1000 个文件");paths.forEach(safeRelativePath);if(new Set(paths).size!==paths.length)throw new AppError("INVALID_INPUT","文件不可重复");assertNoPathCollisions(paths);return paths;}

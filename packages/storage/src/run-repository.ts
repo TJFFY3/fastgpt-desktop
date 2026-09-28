@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   AppError,
   agentEventSchema,
+  approvalRecordSchema,
   runRecordSchema,
   modelSnapshotSchema,
   runStartSchema,
@@ -187,6 +188,7 @@ export class RunRepository {
             "interrupted",
             {runId:run.id},
           );
+        for(const saved of this.db.raw.prepare("SELECT data FROM approvals WHERE namespace_key=? AND run_id=?").all(row.namespace_key as string,run.id)){const a=approvalRecordSchema.parse(JSON.parse(saved.data as string));if(a.view.state==="pending"||a.view.state==="approved"){a.view.state="revoked";this.db.raw.prepare("UPDATE approvals SET data=? WHERE namespace_key=? AND id=?").run(JSON.stringify(a),row.namespace_key as string,a.view.id);this.appendEvent(n,run.id,{type:"approval_decided",approvalId:a.view.id,decision:"revoked"});}}
         this.transition(n, run.id, "interrupted", "WORKER_INTERRUPTED");
         this.appendEvent(n, run.id, { type: "status", status: "interrupted" });
       }

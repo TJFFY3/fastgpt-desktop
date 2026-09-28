@@ -212,10 +212,12 @@ export default function App() {
       selection.current.generation === generation;
     setPendingStarts((previous) => new Set(previous).add(id));
     setError("");
+    let accepted = false;
     try {
       const next = await window.desktop.runs.start(id, text,{attachmentIds:readyFiles.map(a=>a.id),expectedSessionRevision:selected?.revision});
+      accepted = true;
       if (stillSelected()) setRun(next);
-      await drafts.sent(id,text);
+      await drafts.sent(id,text,readyFiles.map(a=>a.id));
       const history = await window.desktop.sessions.messages(id);
       if (stillSelected()) setMessages(history);
       if (selected?.title === "新会话")
@@ -224,8 +226,8 @@ export default function App() {
       await sessionRuns.refresh();
       return true;
     } catch (e) {
-      if (stillSelected()) fail(String(e));
-      return false;
+      if (stillSelected()) fail(accepted ? `消息已发送，页面刷新失败：${String(e)}。请勿重复发送。` : String(e));
+      return accepted;
     } finally {
       setPendingStarts((previous) => {
         const next = new Set(previous);

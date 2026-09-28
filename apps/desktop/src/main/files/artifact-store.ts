@@ -1,5 +1,5 @@
 import { constants } from "node:fs";
-import { mkdir, lstat, chmod, open, rename, unlink, rm, realpath } from "node:fs/promises";
+import { mkdir, lstat, chmod, open, rename, unlink, rm, realpath, readdir } from "node:fs/promises";
 import { randomUUID } from "node:crypto";
 import { join, dirname, resolve } from "node:path";
 import { z } from "zod";
@@ -115,4 +115,6 @@ export class ArtifactStore implements SandboxFileBridge {
   async promote(key:string):Promise<void> {
     await this.locked(key,async()=>{const owner=await this.owned(key);await this.manifest(key);await this.saveOwner({...owner,state:"promoted"});this.entries.delete(key);});
   }
+  /** Startup only: caller owns the instance lock and has not accepted any work. */
+  async collect(retained:Set<string>):Promise<void>{await this.initialize();const names=await readdir(join(this.root,".owners"));if(names.length>10000)throw new AppError("RESOURCE_CLEANUP_PENDING","快照归属记录过多，未进行清理");for(const name of names){const key=name.endsWith(".json")?name.slice(0,-5):"";if(!keySchema.safeParse(key).success||retained.has(key))continue;try{await this.owned(key);}catch{continue;}await this.discard(key).catch(()=>{/* ownership record is the durable retry tombstone */});}}
 }

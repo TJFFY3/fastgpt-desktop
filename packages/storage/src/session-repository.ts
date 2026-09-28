@@ -68,6 +68,8 @@ export class SessionRepository {
       )
       .map(record);
   }
+  /** Main-process lifecycle inventory, never exposed through the desktop bridge. */
+  all():SessionRecord[]{return this.db.raw.prepare("SELECT * FROM sessions").all().map(record);}
   update(n: Namespace, id: string, patch: SessionPatch): SessionRecord {
     return this.db.transaction(()=>{
     const current = this.get(n, id),
