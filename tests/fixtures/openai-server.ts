@@ -12,7 +12,7 @@ export async function startModelServer(handler: (body: Body, res: ServerResponse
     close: () => new Promise<void>((resolve, reject) => { server.close(error => error ? reject(error) : resolve()); server.closeAllConnections(); }) };
 }
 export function writeStream(res: ServerResponse, chunks: unknown[]) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream' });
+  if (!res.headersSent) res.writeHead(200, { 'Content-Type': 'text/event-stream' });
   for (const chunk of chunks) res.write(`data: ${JSON.stringify(chunk)}\n\n`);
   res.end('data: [DONE]\n\n');
 }

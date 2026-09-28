@@ -1,0 +1,6 @@
+import { useRef, useState } from 'react';
+export function Composer({ busy, stopping, disabled, onSend, onStop }: { busy: boolean; stopping: boolean; disabled: boolean; onSend(text: string): Promise<boolean>; onStop(): void }) {
+  const [text, setText] = useState(''), composing = useRef(false), sending = useRef(false);
+  const send = async () => { if (sending.current || busy || disabled || !text.trim()) return; sending.current = true; try { if (await onSend(text.trim())) setText(''); } finally { sending.current = false; } };
+  return <div className="composer"><textarea aria-label="消息" placeholder="输入消息，Enter 发送，Shift+Enter 换行" value={text} disabled={disabled} onChange={e => setText(e.target.value)} onCompositionStart={() => { composing.current = true; }} onCompositionEnd={() => { composing.current = false; }} onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing && !composing.current && e.keyCode !== 229) { e.preventDefault(); void send(); } }} /><div className="composer-footer"><span>模型回复仅作参考 · 工具执行受权限限制</span>{busy ? <button className="stop" disabled={stopping} onClick={onStop}>{stopping ? '停止中…' : '停止'}</button> : <button className="primary" aria-label="发送" disabled={disabled || !text.trim()} onClick={() => void send()}>发送 <span aria-hidden="true">↵</span></button>}</div></div>;
+}
