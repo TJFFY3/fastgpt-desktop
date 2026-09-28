@@ -8,6 +8,9 @@ files:
   - package.json
 asar: true
 npmRebuild: false
+extraResources:
+  - from: native-build
+    to: safe-files
 mac:
   category: public.app-category.productivity
   identity: null

@@ -5,6 +5,7 @@
   "workspaces": ["apps/*", "packages/*"],
   "engines": { "node": ">=22.12.0" },
   "scripts": {
+    "build:safe-files": "node scripts/build-safe-files.mjs",
     "dev": "npm run dev -w @fastgpt/desktop",
     "build": "npm run build -w @fastgpt/desktop",
     "build:test": "npm run build -w @fastgpt/desktop -- --mode test",
