@@ -6,6 +6,7 @@ import {
   utilityProcess,
   session,
   dialog,
+  systemPreferences,
 } from "electron";
 import { join, isAbsolute, resolve } from "node:path";
 import { mkdirSync, existsSync } from "node:fs";
@@ -24,6 +25,7 @@ import { createFeatureServices } from "./feature-services";
 import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
 import { registerWorkspaceHandlers } from "./ipc/workspace-handlers";
 import { registerSpeechHandlers } from "./ipc/speech-handlers";
+import { MediaPermissionService } from "./speech/media-permissions";
 import { registerApprovalHandlers } from "./ipc/approval-handlers";
 import { registerWorkspaceTools } from "./tools/workspace-tools";
 protocol.registerSchemesAsPrivileged([
@@ -45,6 +47,7 @@ if (__TEST_BUILD__ && process.env.FASTGPT_DESKTOP_TEST_DATA_DIR) {
   app.setPath("userData", path);
 }
 app.setName("FastGPT Desktop");
+if(__TEST_BUILD__&&process.env.FASTGPT_DESKTOP_TEST_FAKE_AUDIO==="1")app.commandLine.appendSwitch("use-fake-device-for-media-stream");
 // Only the owner may recover runs or write this user-data store.
 if (!app.requestSingleInstanceLock()) app.quit();
 else
@@ -114,6 +117,9 @@ else
         ? process.env.ELECTRON_RENDERER_URL
         : undefined;
       const devOrigin = devUrl ? new URL(devUrl).origin : undefined;
+      const media=new MediaPermissionService({speech:features.speech,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,consent:()=>__TEST_BUILD__&&process.env.FASTGPT_DESKTOP_TEST_FAKE_AUDIO==="1"?Promise.resolve(true):process.platform==="darwin"?systemPreferences.askForMediaAccess("microphone"):Promise.resolve(true)});
+      session.defaultSession.setPermissionCheckHandler((wc,permission,origin,details)=>media.check(wc,permission,origin,details));
+      session.defaultSession.setPermissionRequestHandler((wc,permission,callback,details)=>media.request(wc,permission,callback,details));
       // A bounded test-only delay reproduces asynchronous keyring/start races.
       const testStartDelay = __TEST_BUILD__
         ? Math.min(
@@ -140,7 +146,7 @@ else
         confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
       });
       registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,exports:features.exports,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
-      registerSpeechHandlers(ipcMain,{speech:features.speech,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
+      registerSpeechHandlers(ipcMain,{speech:features.speech,media,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
       registerApprovalHandlers(ipcMain,{approvals:features.approvals,sandbox:features.sandbox,store,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,dataDirectory:app.getPath("userData"),imagePreparation:features.imagePreparation});
       if (devUrl) await window.loadURL(devUrl);
       else {
@@ -154,6 +160,7 @@ else
         quitting = true;
         features.imagePreparation.controller?.abort();
         features.speech.shutdown();
+        media.shutdown();
         void supervisor.shutdown().then(async()=>{await Promise.allSettled([features.sandbox.shutdown(),features.imagePreparation.promise??Promise.resolve()]);}).finally(() => {
           agents.dispose();
           features.exports.dispose();

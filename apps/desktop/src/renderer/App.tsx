@@ -17,6 +17,8 @@ import { useDrafts } from "./hooks/useDrafts";
 import { SandboxStatus } from "./components/SandboxStatus";
 import { WorkspacePanel } from "./components/WorkspacePanel";
 import { SpeechSettings } from "./components/SpeechSettings";
+import { useVoiceInput } from "./hooks/useVoiceInput";
+import { VoiceInput } from "./components/VoiceInput";
 const active = [
   "queued",
   "running",
@@ -74,6 +76,7 @@ export default function App() {
       pendingStarts.has(selectedId ?? "") ||
       (!!latestStatus && active.includes(latestStatus));
   const drafts=useDrafts(selectedId,refresh),readyFiles=drafts.draft.files.filter(a=>a.state==="ready");
+  const voice=useVoiceInput(selectedId,{draftText:drafts.draft.text,appendDraft:drafts.appendText,disabled:busy||!!selected?.archived,ensureSession:async()=>{if(selection.current.id)return selection.current.id;if(!providerId)throw new Error("请先配置并选择聊天模型，再创建语音会话");const g=selection.current.generation,s=await window.desktop.sessions.create({title:"新会话",providerId});if(selection.current.generation!==g)throw new Error("会话已切换，请重新开始录音");selectSession(s);await refresh();return s.id;}});
   const refreshProviders = useCallback(async () => {
     try {
       const values = await window.desktop.providers.list();
@@ -190,7 +193,7 @@ export default function App() {
     }
   };
   const changeModel=async(id:string)=>{
-    if(busy) return;
+    if(busy||voice.active) return;
     if(!selectedId) {setProviderId(id);return;}
     const sid=selectedId,generation=selection.current.generation;setModelSwitching(true);
     try {
@@ -201,7 +204,7 @@ export default function App() {
     finally {setModelSwitching(false);}
   };
   const send = async (text: string) => {
-    if (!selectedId || busy || drafts.draft.pending || drafts.draft.error) return false;
+    if (!selectedId || busy || voice.active || drafts.draft.pending || drafts.draft.error) return false;
     const id = selectedId,
       generation = ++selection.current.generation;
     const stillSelected = () =>
@@ -262,7 +265,7 @@ export default function App() {
               本地空间 <span>／</span> 对话
             </span>
           </div>
-          <ModelPicker providers={providers} value={selected?.providerId ?? providerId} disabled={busy || !!selected?.archived} onChange={id=>void changeModel(id)} />
+          <ModelPicker providers={providers} value={selected?.providerId ?? providerId} disabled={busy || voice.active || !!selected?.archived} onChange={id=>void changeModel(id)} />
           <SandboxStatus/>
           <button onClick={()=>setWorkspaceOpen(true)}>工作区</button>
           <button onClick={()=>setSpeechSettings(true)}>语音设置</button>
@@ -297,6 +300,7 @@ export default function App() {
           <Composer
             key={selectedId ?? "none"}
             busy={busy}
+            voiceBusy={voice.active} voice={<VoiceInput voice={voice} disabled={busy||!!selected?.archived||!providers.length} onSettings={()=>setSpeechSettings(true)}/>}
             text={drafts.draft.text} onText={drafts.setText} files={readyFiles} pending={drafts.draft.pending} error={drafts.draft.error}
             onPick={()=>void drafts.pick()} onDrop={files=>void drafts.drop(files)} onRemove={id=>void drafts.remove(id)} onClearError={drafts.clearError}
             destination={selectedProvider?`${selectedProvider.name}（${selectedProvider.baseUrl}）`:"未配置服务"}
@@ -326,8 +330,8 @@ export default function App() {
           onClose={() => setSettings(false)}
         />
       )}
-      {workspaceOpen&&<WorkspacePanel key={selectedId??"none"} sessionId={selectedId} busy={busy} onClose={()=>setWorkspaceOpen(false)} onChanged={refresh}/>}
-      {speechSettings&&<SpeechSettings onClose={()=>setSpeechSettings(false)}/>}
+      {workspaceOpen&&<WorkspacePanel key={selectedId??"none"} sessionId={selectedId} busy={busy||voice.active} onClose={()=>setWorkspaceOpen(false)} onChanged={refresh}/>}
+      {speechSettings&&<SpeechSettings onClose={()=>{setSpeechSettings(false);void voice.refresh().catch(e=>fail(String(e)));}}/>}
     </div>
   );
 }

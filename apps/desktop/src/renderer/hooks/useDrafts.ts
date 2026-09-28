@@ -15,6 +15,7 @@ export function useDrafts(sessionId:string|null,onFilesChange:()=>Promise<void>)
   };
   return {draft:sessionId?drafts[sessionId]??empty:empty,
     setText:(text:string)=>{if(sessionId)change(sessionId,d=>({...d,text}));},
+    appendText:(sid:string,text:string)=>change(sid,d=>({...d,text:d.text?`${d.text}\n${text}`:text})),
     clearError:()=>{if(sessionId)change(sessionId,d=>({...d,error:""}));},
     pick:()=>sessionId?operation(sessionId,()=>window.desktop.attachments.pick(sessionId)):Promise.resolve(),
     drop:(files:File[])=>sessionId?operation(sessionId,()=>window.desktop.attachments.importDropped(sessionId,files)):Promise.resolve(),

@@ -21,6 +21,8 @@ extraResources:
 mac:
   category: public.app-category.productivity
   identity: null
+  extendInfo:
+    NSMicrophoneUsageDescription: 点击录音时使用麦克风；完成后将音频发送到您配置的转写服务，文字由您确认插入草稿。
 win:
   target: nsis
 linux:
