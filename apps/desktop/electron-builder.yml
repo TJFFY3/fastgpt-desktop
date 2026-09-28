@@ -11,6 +11,13 @@ npmRebuild: false
 extraResources:
   - from: native-build
     to: safe-files
+  - from: ../../packages/sandbox/image
+    to: sandbox-image
+    filter:
+      - Dockerfile
+      - runner.py
+      - transfer.py
+      - .dockerignore
 mac:
   category: public.app-category.productivity
   identity: null

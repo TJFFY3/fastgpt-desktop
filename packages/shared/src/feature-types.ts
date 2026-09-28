@@ -41,6 +41,7 @@ export interface SandboxFileBridge {
   read(key: string, path: string): AsyncIterable<Uint8Array>;
   createSnapshot(): Promise<string>;
   write(key: string, path: string, data: AsyncIterable<Uint8Array>): Promise<void>;
+  directory(key: string, path: string): Promise<void>;
   discard(key: string): Promise<void>;
 }
 export interface AttachmentApi {
