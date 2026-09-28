@@ -5,7 +5,7 @@ export class CredentialRepository {
   constructor(private db: Database) {}
   put(n: Namespace, ref: string, ciphertext: Uint8Array) {
     this.db.raw
-      .prepare("INSERT OR REPLACE INTO credentials VALUES(?,?,?)")
+      .prepare("INSERT OR REPLACE INTO credentials(namespace_key,ref,ciphertext) VALUES(?,?,?)")
       .run(namespaceKey(n), ref, ciphertext);
   }
   get(n: Namespace, ref: string): Uint8Array | null {

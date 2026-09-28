@@ -25,10 +25,12 @@ export const validDraft: ProviderDraft = {
     tools: true,
     temperature: false,
     outputTokenField: "max_tokens",
+    reasoningField: "none",
   },
 };
 export const fakeModelProfile: ModelProfile = {
   ...validDraft,
   id: "provider-1",
   credentialRef: null,
+  revision: "fixture-v1",
 };

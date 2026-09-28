@@ -9,6 +9,7 @@ import type {
   SessionPatch,
   SessionRecord,
 } from "./types";
+import type { RunStartOptions } from "./feature-types";
 export interface DesktopApi {
   providers: {
     list(): Promise<ProviderView[]>;
@@ -31,7 +32,7 @@ export interface DesktopApi {
   };
   runs: {
     list(sessionId: string): Promise<RunRecord[]>;
-    start(sessionId: string, text: string): Promise<RunRecord>;
+    start(sessionId: string, text: string, options?: RunStartOptions): Promise<RunRecord>;
     cancel(runId: string): Promise<void>;
     events(runId: string, afterSeq?: number): Promise<RunEvent[]>;
   };

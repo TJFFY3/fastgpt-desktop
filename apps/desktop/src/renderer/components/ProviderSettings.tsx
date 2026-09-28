@@ -15,6 +15,7 @@ const initial: ProviderDraft = {
     tools: false,
     temperature: false,
     outputTokenField: "max_tokens",
+    reasoningField: "none",
   },
 };
 export function ProviderSettings({
@@ -42,7 +43,7 @@ export function ProviderSettings({
     setError("");
     setNotice("");
     if (p) {
-      const { id: _id, credentialState: _state, ...value } = p;
+      const { id: _id, revision: _revision, credentialState: _state, ...value } = p;
       setDraft(value);
     } else setDraft(initial);
   };
