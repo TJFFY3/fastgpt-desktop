@@ -44,3 +44,12 @@ it('reserves each tool call once, retains results and rejects changed arguments'
   expect(store.runs.toolResult(namespaceA, r.id, 'c1')).toEqual({ content: 'value', isError: false });
   expect(() => store.runs.reserveToolCall(namespaceA, r.id, { ...call, arguments: '{"x":1}' })).toThrow(/MODEL_PROTOCOL_ERROR/);
 });
+it('retains streamed partial text and a recovery event after an application restart', () => {
+  const r = store.runs.createWithUserMessage(namespaceA, sessionId, 'hi');
+  store.runs.transition(namespaceA, r.id, 'running');
+  store.runs.appendEvent(namespaceA, r.id, { type: 'text_delta', text: '未完成回复' });
+  store.close(); store = openStore(path); store.runs.recoverInterrupted();
+  expect(store.sessions.messages(namespaceA, sessionId).at(-1)).toMatchObject({ content: '未完成回复', status: 'interrupted' });
+  expect(store.runs.events(namespaceA, r.id).at(-1)).toMatchObject({ type: 'status', status: 'interrupted' });
+  store.runs.recoverInterrupted(); expect(store.sessions.messages(namespaceA, sessionId)).toHaveLength(2);
+});

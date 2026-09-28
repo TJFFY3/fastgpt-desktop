@@ -16,7 +16,18 @@ export class RunRepository {
   transition(n: Namespace, id: string, status: RunStatus, errorCode: string | null = null): RunRecord { const old = this.get(n, id); if (!allowed[old.status]?.includes(status)) throw new AppError('INVALID_INPUT', '不允许的运行状态转换'); this.db.raw.prepare('UPDATE runs SET status=?,error_code=?,updated_at=? WHERE namespace_key=? AND id=?').run(status, errorCode, Date.now(), namespaceKey(n), id); return this.get(n, id); }
   appendEvent(n: Namespace, id: string, event: AgentEvent): RunEvent { return this.db.transaction(() => { const run = this.get(n, id), value = agentEventSchema.parse(event), key = namespaceKey(n), row = this.db.raw.prepare('SELECT COALESCE(MAX(seq),0)+1 AS seq FROM run_events WHERE namespace_key=? AND run_id=?').get(key, id)!; const result = { ...value, runId: id, sessionId: run.sessionId, seq: row.seq as number, createdAt: Date.now() }; this.db.raw.prepare('INSERT INTO run_events VALUES(?,?,?,?)').run(key, id, result.seq, JSON.stringify(result)); return result; }); }
   events(n: Namespace, id: string, afterSeq = 0): RunEvent[] { this.get(n, id); return this.db.raw.prepare('SELECT data FROM run_events WHERE namespace_key=? AND run_id=? AND seq>? ORDER BY seq').all(namespaceKey(n), id, afterSeq).map(r => JSON.parse(r.data as string)); }
-  recoverInterrupted(): number { return Number(this.db.raw.prepare("UPDATE runs SET status='interrupted',error_code='WORKER_INTERRUPTED',updated_at=? WHERE status IN ('queued','running','waiting_approval','waiting_input','cancelling')").run(Date.now()).changes); }
+  recoverInterrupted(): number {
+    return this.db.transaction(() => {
+      const rows = this.db.raw.prepare("SELECT * FROM runs WHERE status IN ('queued','running','waiting_approval','waiting_input','cancelling')").all();
+      for (const row of rows) {
+        const [instanceId, accountId, teamId] = JSON.parse(row.namespace_key as string), n = { instanceId, accountId, teamId }, run = record(row); let partial = '';
+        for (const e of this.events(n, run.id)) { if (e.type === 'text_delta') partial += e.text; if (e.type === 'assistant_message' && e.message.role === 'assistant') partial = ''; }
+        if (partial) this.sessions.appendMessage(n, run.sessionId, { role: 'assistant', content: partial }, 'interrupted');
+        this.transition(n, run.id, 'interrupted', 'WORKER_INTERRUPTED'); this.appendEvent(n, run.id, { type: 'status', status: 'interrupted' });
+      }
+      return rows.length;
+    });
+  }
   reserveToolCall(n: Namespace, id: string, call: ToolCall): 'reserved' | 'completed' | 'unresolved' {
     return this.db.transaction(() => { this.get(n, id); const key = namespaceKey(n), row = this.db.raw.prepare('SELECT * FROM tool_calls WHERE namespace_key=? AND run_id=? AND call_id=?').get(key, id, call.id); if (row) { if (row.name !== call.name || row.arguments !== call.arguments) throw new AppError('MODEL_PROTOCOL_ERROR', '工具调用编号重复且参数不一致'); return row.result === null ? 'unresolved' : 'completed'; } this.db.raw.prepare('INSERT INTO tool_calls VALUES(?,?,?,?,?,NULL)').run(key, id, call.id, call.name, call.arguments); return 'reserved'; });
   }
