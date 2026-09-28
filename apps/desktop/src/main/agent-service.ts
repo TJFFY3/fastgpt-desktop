@@ -87,6 +87,7 @@ export class AgentService {
     this.clock.start(run.id);
     const event = async (value: AgentEvent) => {
       const persisted = this.store.transaction(() => {
+        let messageId:string|undefined;
         const current = this.store.runs.get(n, run.id);
         if (!activeStatuses.includes(current.status)) return;
         // A cancelled worker may finish a pending round; it cannot commit a new successful response.
@@ -120,16 +121,17 @@ export class AgentService {
           }
         } else if (value.type === "text_delta") state.partial += value.text;
         else if (value.type === "assistant_message") {
-          this.store.sessions.appendMessage(
+          const message=this.store.sessions.appendMessage(
             n,
             sessionId,
             value.message,
             "complete",
             {runId:run.id},
           );
+          messageId=message.id;
           if (value.message.role === "assistant") state.partial = "";
         } else if (value.type === "error") state.error = value.code;
-        return this.store.runs.appendEvent(n, run.id, value);
+        return this.store.runs.appendEvent(n, run.id, value,messageId?{messageId}:undefined);
       });
       if (
         persisted &&

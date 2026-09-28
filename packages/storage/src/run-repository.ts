@@ -151,7 +151,7 @@ export class RunRepository {
     this.get(n, id);
     return this.db.raw
       .prepare(
-        "SELECT data FROM run_events WHERE namespace_key=? AND run_id=? AND seq>? ORDER BY seq",
+        "SELECT data FROM run_events WHERE namespace_key=? AND run_id=? AND seq>? ORDER BY seq LIMIT 500",
       )
       .all(namespaceKey(n), id, afterSeq)
       .map((r) => JSON.parse(r.data as string));
@@ -170,10 +170,14 @@ export class RunRepository {
           n = { instanceId, accountId, teamId },
           run = record(row);
         let partial = "";
-        for (const e of this.events(n, run.id)) {
-          if (e.type === "text_delta") partial += e.text;
-          if (e.type === "assistant_message" && e.message.role === "assistant")
-            partial = "";
+        let after=0;
+        while(true) {
+          const page=this.events(n,run.id,after);
+          for (const e of page) {
+            if (e.type === "text_delta") partial += e.text;
+            if (e.type === "assistant_message" && e.message.role === "assistant") partial = "";
+          }
+          if(page.length<500) break;after=page.at(-1)!.seq;
         }
         if (partial)
           this.sessions.appendMessage(

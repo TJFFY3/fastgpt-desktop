@@ -264,6 +264,11 @@ export function ProviderSettings({
               </label>
             </div>
             <div className="capability-box">
+              <label>公开思考字段
+                <select aria-label="公开思考字段" value={draft.capabilities.reasoningField} onChange={e=>field("capabilities",{...draft.capabilities,reasoningField:e.target.value as "none"|"reasoning_content"})}>
+                  <option value="none">不读取（默认）</option><option value="reasoning_content">reasoning_content（服务需支持）</option>
+                </select>
+              </label>
               <label>
                 <input
                   type="checkbox"

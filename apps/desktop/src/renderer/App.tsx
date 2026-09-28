@@ -11,7 +11,8 @@ import { SessionSidebar } from "./components/SessionSidebar";
 import { ProviderSettings } from "./components/ProviderSettings";
 import { ChatView } from "./components/ChatView";
 import { Composer } from "./components/Composer";
-import { RunDetails } from "./components/RunDetails";
+import { ModelPicker } from "./components/ModelPicker";
+import { useSessionRuns } from "./hooks/useSessionRuns";
 const active = [
   "queued",
   "running",
@@ -35,6 +36,8 @@ export default function App() {
     [messages, setMessages] = useState<MessageRecord[]>([]),
     [run, setRun] = useState<RunRecord | null>(null),
     [pendingStarts, setPendingStarts] = useState<Set<string>>(new Set());
+  const [modelSwitching,setModelSwitching]=useState(false);
+  const sessionRuns=useSessionRuns(selectedId);
   const selectSession = useCallback((record: SessionRecord | null) => {
     initiallySelected.current = true;
     selection.current = {
@@ -61,6 +64,7 @@ export default function App() {
       run?.status ??
       null,
     busy =
+      modelSwitching ||
       pendingStarts.has(selectedId ?? "") ||
       (!!latestStatus && active.includes(latestStatus));
   const refreshProviders = useCallback(async () => {
@@ -178,6 +182,17 @@ export default function App() {
       fail(String(e));
     }
   };
+  const changeModel=async(id:string)=>{
+    if(busy) return;
+    if(!selectedId) {setProviderId(id);return;}
+    const sid=selectedId,generation=selection.current.generation;setModelSwitching(true);
+    try {
+      const value=await window.desktop.sessions.update(sid,{providerId:id});
+      if(selection.current.id===sid && selection.current.generation===generation) setSelectedSnapshot(value);
+      await refresh();
+    } catch(e) {if(selection.current.id===sid) fail(String(e));}
+    finally {setModelSwitching(false);}
+  };
   const send = async (text: string) => {
     if (!selectedId || busy) return false;
     const id = selectedId,
@@ -188,13 +203,14 @@ export default function App() {
     setPendingStarts((previous) => new Set(previous).add(id));
     setError("");
     try {
-      const next = await window.desktop.runs.start(id, text);
+      const next = await window.desktop.runs.start(id, text,{attachmentIds:[],expectedSessionRevision:selected?.revision});
       if (stillSelected()) setRun(next);
       const history = await window.desktop.sessions.messages(id);
       if (stillSelected()) setMessages(history);
       if (selected?.title === "新会话")
         await update(id, { title: text.slice(0, 30) });
       await refresh();
+      await sessionRuns.refresh();
       return true;
     } catch (e) {
       if (stillSelected()) fail(String(e));
@@ -238,23 +254,7 @@ export default function App() {
               本地空间 <span>／</span> 对话
             </span>
           </div>
-          <div className="model-selector">
-            <span className="model-dot" />
-            <select
-              aria-label="当前模型"
-              value={selected?.providerId ?? providerId}
-              disabled={!!selectedId}
-              onChange={(e) => setProviderId(e.target.value)}
-            >
-              {!providers.length && <option value="">尚未配置模型</option>}
-              {providers.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-            <span className="local-badge">LOCAL</span>
-          </div>
+          <ModelPicker providers={providers} value={selected?.providerId ?? providerId} disabled={busy || !!selected?.archived} onChange={id=>void changeModel(id)} />
         </header>
         {(error || eventError || runtimeError) && (
           <div role="alert" className="error-banner">
@@ -276,9 +276,11 @@ export default function App() {
           hasSession={!!selectedId}
           hasModels={!!providers.length}
           onSettings={() => setSettings(true)}
+          runs={sessionRuns.runs}
+          eventsByRun={sessionRuns.eventsByRun}
+          onLoadRun={id=>void sessionRuns.loadEvents(id).catch(e=>fail(String(e)))}
         />
         <div className="chat-bottom">
-          <RunDetails status={latestStatus} events={events} />
           <Composer
             key={selectedId ?? "none"}
             busy={busy}
