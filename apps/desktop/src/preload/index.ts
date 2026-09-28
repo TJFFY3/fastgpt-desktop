@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from "electron";
+import { contextBridge, ipcRenderer, webUtils } from "electron";
 import type {
   DesktopApi,
   IpcResult,
@@ -11,6 +11,15 @@ async function invoke<T>(channel: string, input: unknown): Promise<T> {
   return result.data;
 }
 const api: DesktopApi = {
+  attachments:{
+    pick:sessionId=>invoke("attachments:pick",{sessionId}),
+    importDropped:(sessionId,files)=>{
+      if(!Array.isArray(files)||files.length<1||files.length>16)return Promise.reject(new Error("INVALID_INPUT: 文件数量无效"));
+      const paths=files.map(file=>webUtils.getPathForFile(file));if(paths.some(p=>!p))return Promise.reject(new Error("INVALID_INPUT: 请拖入电脑上的真实文件"));
+      return invoke("attachments:import",{sessionId,paths});
+    },
+    list:sessionId=>invoke("attachments:list",{sessionId}),removeDraft:id=>invoke("attachments:remove",{id}),
+  },
   providers: {
     list: () => invoke("providers:list", {}),
     save: (draft, apiKey, id) =>

@@ -5,6 +5,7 @@ import {
   safeStorage,
   utilityProcess,
   session,
+  dialog,
 } from "electron";
 import { join, isAbsolute } from "node:path";
 import { mkdirSync } from "node:fs";
@@ -18,6 +19,8 @@ import { createBuiltinTools } from "./tool-gateway";
 import { createWindow } from "./window";
 import { installProtocol } from "./protocol";
 import { registerIpc } from "./ipc";
+import { createFeatureServices } from "./feature-services";
+import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -77,6 +80,7 @@ else
       let agents: AgentService;
       const principal = new PrincipalService((n) => agents.cancelNamespace(n));
       const window = await createWindow(join(__dirname, "../preload/index.js"));
+      const features=createFeatureServices({store,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id});
       app.on("second-instance", () => {
         if (window.isDestroyed()) return;
         if (window.isMinimized()) window.restore();
@@ -92,6 +96,7 @@ else
         (e) => {
           if (!window.isDestroyed()) window.webContents.send("run:event", e);
         },
+        (n,request,profile,tools)=>features.context.assembleContext(n,request.sessionId,request.text,request.attachmentIds,profile,tools),
       );
       const devUrl = __DEV_BUILD__
         ? process.env.ELECTRON_RENDERER_URL
@@ -117,6 +122,10 @@ else
         beforeRunStart: testStartDelay
           ? () => new Promise((resolve) => setTimeout(resolve, testStartDelay))
           : undefined,
+      });
+      registerAttachmentHandlers(ipcMain,{attachments:features.attachments,grants:features.grants,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,
+        pick:async()=>{const result=await dialog.showOpenDialog(window,{title:"添加附件（只创建本地副本）",properties:["openFile","multiSelections"]});return result.canceled?[]:result.filePaths;},
+        confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
       });
       if (devUrl) await window.loadURL(devUrl);
       else {

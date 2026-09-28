@@ -3,8 +3,10 @@ import type {
   MessageRecord,
   RunEvent,
   RunRecord,
+  AttachmentView,
 } from "../../../../../packages/shared/src/index";
 import { RunTrace } from "./RunTrace";
+import { AttachmentList } from "./AttachmentList";
 export function ChatView({
   messages,
   events,
@@ -12,6 +14,7 @@ export function ChatView({
   hasModels,
   onSettings,
   runs=[],eventsByRun=new Map(),onLoadRun,
+  attachments=[],
 }: {
   messages: MessageRecord[];
   events: RunEvent[];
@@ -19,6 +22,7 @@ export function ChatView({
   hasModels: boolean;
   onSettings(): void;
   runs?:RunRecord[];eventsByRun?:Map<string,RunEvent[]>;onLoadRun?(id:string):void;
+  attachments?:AttachmentView[];
 }) {
   const bottom = useRef<HTMLDivElement>(null);
   const known=new Set(messages.map(m=>m.id));
@@ -105,6 +109,7 @@ export function ChatView({
                     </div>
                   )}
                   {m.content && <p>{m.content}</p>}
+                  <AttachmentList files={attachments.filter(a=>m.attachmentIds.includes(a.id))}/>
                   {m.toolCalls?.map((c) => (
                     <div className="tool-request" key={c.id}>
                       调用工具 <code>{c.name}</code>

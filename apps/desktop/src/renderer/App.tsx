@@ -13,6 +13,7 @@ import { ChatView } from "./components/ChatView";
 import { Composer } from "./components/Composer";
 import { ModelPicker } from "./components/ModelPicker";
 import { useSessionRuns } from "./hooks/useSessionRuns";
+import { useDrafts } from "./hooks/useDrafts";
 const active = [
   "queued",
   "running",
@@ -67,6 +68,7 @@ export default function App() {
       modelSwitching ||
       pendingStarts.has(selectedId ?? "") ||
       (!!latestStatus && active.includes(latestStatus));
+  const drafts=useDrafts(selectedId,refresh),readyFiles=drafts.draft.files.filter(a=>a.state==="ready");
   const refreshProviders = useCallback(async () => {
     try {
       const values = await window.desktop.providers.list();
@@ -194,7 +196,7 @@ export default function App() {
     finally {setModelSwitching(false);}
   };
   const send = async (text: string) => {
-    if (!selectedId || busy) return false;
+    if (!selectedId || busy || drafts.draft.pending || drafts.draft.error) return false;
     const id = selectedId,
       generation = ++selection.current.generation;
     const stillSelected = () =>
@@ -203,12 +205,13 @@ export default function App() {
     setPendingStarts((previous) => new Set(previous).add(id));
     setError("");
     try {
-      const next = await window.desktop.runs.start(id, text,{attachmentIds:[],expectedSessionRevision:selected?.revision});
+      const next = await window.desktop.runs.start(id, text,{attachmentIds:readyFiles.map(a=>a.id),expectedSessionRevision:selected?.revision});
       if (stillSelected()) setRun(next);
+      await drafts.sent(id,text);
       const history = await window.desktop.sessions.messages(id);
       if (stillSelected()) setMessages(history);
       if (selected?.title === "新会话")
-        await update(id, { title: text.slice(0, 30) });
+        await update(id, { title: (text||readyFiles[0]?.name||"文件会话").slice(0, 30) });
       await refresh();
       await sessionRuns.refresh();
       return true;
@@ -276,6 +279,7 @@ export default function App() {
           hasSession={!!selectedId}
           hasModels={!!providers.length}
           onSettings={() => setSettings(true)}
+          attachments={drafts.draft.files}
           runs={sessionRuns.runs}
           eventsByRun={sessionRuns.eventsByRun}
           onLoadRun={id=>void sessionRuns.loadEvents(id).catch(e=>fail(String(e)))}
@@ -284,6 +288,9 @@ export default function App() {
           <Composer
             key={selectedId ?? "none"}
             busy={busy}
+            text={drafts.draft.text} onText={drafts.setText} files={readyFiles} pending={drafts.draft.pending} error={drafts.draft.error}
+            onPick={()=>void drafts.pick()} onDrop={files=>void drafts.drop(files)} onRemove={id=>void drafts.remove(id)} onClearError={drafts.clearError}
+            destination={selectedProvider?`${selectedProvider.name}（${selectedProvider.baseUrl}）`:"未配置服务"}
             stopping={latestStatus === "cancelling"}
             disabled={
               !selected ||

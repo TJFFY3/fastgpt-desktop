@@ -9,6 +9,7 @@ import {
   type ToolCall,
   type ToolExecutor,
 } from "../../shared/src/index";
+import { assertContextBudget } from "./context-budget";
 export class AgentRunner {
   constructor(
     private dependencies: {
@@ -34,6 +35,7 @@ export class AgentRunner {
         let text = "",
           reason: string | undefined;
         const tools = input.profile.capabilities.tools ? input.tools : [];
+        assertContextBudget(input.profile,messages,tools);
         for await (const event of model.stream({
           profile: input.profile,
           apiKey,

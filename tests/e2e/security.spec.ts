@@ -19,8 +19,9 @@ test("renderer has only the narrow bridge, CSP blocks network and keys stay off 
     ).toEqual({
       require: "undefined",
       process: "undefined",
-      keys: ["providers", "sessions", "runs", "onRunEvent"],
+      keys: ["attachments", "providers", "sessions", "runs", "onRunEvent"],
     });
+    expect(await page.evaluate(()=>Object.keys(window.desktop.attachments))).toEqual(["pick","importDropped","list","removeDraft"]);
     const sandboxed = await app.evaluate(({ app, BrowserWindow }) => {
       const pid = BrowserWindow.getAllWindows()[0].webContents.getOSProcessId();
       return app.getAppMetrics().find((m) => m.pid === pid)?.sandboxed;
