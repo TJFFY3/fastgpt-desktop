@@ -11,6 +11,8 @@
     "build:test": "npm run build -w @fastgpt/desktop -- --mode test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:sandbox": "vitest run --config vitest.sandbox.config.ts",
+    "prepare:sandbox": "node scripts/prepare-sandbox.mjs",
     "test:e2e": "npm run build:test && playwright test",
     "package:dir": "npm run build && npm run package:dir -w @fastgpt/desktop"
   },
