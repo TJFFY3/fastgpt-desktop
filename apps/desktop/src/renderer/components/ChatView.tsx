@@ -81,20 +81,14 @@ export function ChatView({
               </details>
             ) : (
               <article key={m.id} className={`message ${m.role}`}>
-                <div className="message-avatar">
-                  {m.role === "user" ? "你" : "F"}
-                </div>
                 <div className="message-body">
-                  <div className="message-label">
-                    {m.role === "user" ? "你" : "FastGPT Agent"}
-                    {m.status !== "complete" && (
-                      <span>
-                        {m.status === "interrupted"
-                          ? "已中断 · 未完成"
-                          : "部分回复"}
-                      </span>
-                    )}
-                  </div>
+                  {m.status !== "complete" && (
+                    <div className="message-status">
+                      {m.status === "interrupted"
+                        ? "已中断 · 未完成"
+                        : "部分回复"}
+                    </div>
+                  )}
                   {m.content && <p>{m.content}</p>}
                   {m.toolCalls?.map((c) => (
                     <div className="tool-request" key={c.id}>
@@ -107,11 +101,8 @@ export function ChatView({
           )}
           {partial && (
             <article className="message assistant streaming">
-              <div className="message-avatar">F</div>
               <div className="message-body">
-                <div className="message-label">
-                  FastGPT Agent <span>正在生成</span>
-                </div>
+                <div className="message-status">正在生成</div>
                 <p>{partial}</p>
               </div>
             </article>
