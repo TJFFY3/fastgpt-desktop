@@ -33,7 +33,6 @@ function setup() {
       event: (e: AgentEvent) => Promise<void>;
       tool: (c: ToolCall) => Promise<ToolResult>;
       exit: () => Promise<void>;
-      stopping?:()=>void;
     }
   >();
   const supervisor = {
@@ -43,9 +42,8 @@ function setup() {
       event: (e: AgentEvent) => Promise<void>,
       tool: (c: ToolCall) => Promise<ToolResult>,
       exit: () => Promise<void>,
-      stopping?:()=>void,
     ) => {
-      workers.set(input.runId, { input, event, tool, exit,stopping });
+      workers.set(input.runId, { input, event, tool, exit });
     },
     cancel: () => {},
     shutdown: async () => {},
@@ -66,9 +64,6 @@ function setup() {
     notifications,
   };
 }
-it("main tool events use the same persist-before-publish path and reject foreign/terminal contexts",async()=>{const s=setup();try{const p=await s.providers.save(namespaceA,validDraft,"key"),session=s.store.sessions.create(namespaceA,{title:"main events",providerId:p.id}),run=await s.service.start(namespaceA,session.id,"hi"),context={namespace:namespaceA,sessionId:session.id,runId:run.id};await s.workers.get(run.id)!.event({type:"status",status:"running"});await s.service.emit(context,{type:"command_started",id:"call",command:"echo safe",cwd:"."});expect(s.store.runs.events(namespaceA,run.id).at(-1)?.type).toBe("command_started");expect(s.notifications.at(-1)?.type).toBe("command_started");await expect(s.service.emit({...context,namespace:namespaceB},{type:"status",status:"running"})).rejects.toThrow();await s.workers.get(run.id)!.event({type:"status",status:"completed"});await expect(s.service.emit(context,{type:"command_output",id:"call",channel:"stdout",text:"late"})).rejects.toMatchObject({code:"PERMISSION_DENIED"});}finally{s.service.dispose();s.store.close();}});
-it("main cancellation cleanup is persisted while cancelling, without accepting late output or success",async()=>{const s=setup();try{const p=await s.providers.save(namespaceA,validDraft,"key"),session=s.store.sessions.create(namespaceA,{title:"cleanup",providerId:p.id}),run=await s.service.start(namespaceA,session.id,"hi"),context={namespace:namespaceA,sessionId:session.id,runId:run.id};await s.workers.get(run.id)!.event({type:"status",status:"running"});await s.service.cancel(namespaceA,run.id);await s.service.emit(context,{type:"command_finished",id:"call",exitCode:null,elapsedMs:123,reason:"cancelled",truncated:false});expect(s.store.runs.events(namespaceA,run.id).at(-1)?.type).toBe("command_finished");await expect(s.service.emit(context,{type:"workspace_checkpoint",id:"late",workspaceId:"late",revision:4})).rejects.toMatchObject({code:"PERMISSION_DENIED"});}finally{s.service.dispose();s.store.close();}});
-it("abort-before-drain on an unexpected worker exit remains interrupted rather than a user cancellation",async()=>{const s=setup();try{const p=await s.providers.save(namespaceA,validDraft,"key"),session=s.store.sessions.create(namespaceA,{title:"crash",providerId:p.id}),run=await s.service.start(namespaceA,session.id,"hi"),worker=s.workers.get(run.id)!;await worker.event({type:"status",status:"running"});worker.stopping?.();await worker.exit();expect(s.store.runs.get(namespaceA,run.id).status).toBe("interrupted");}finally{s.service.dispose();s.store.close();}});
 it("starts atomically, denies another identity and persists before publishing", async () => {
   const s = setup();
   try {

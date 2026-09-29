@@ -21,7 +21,7 @@ export const relativePathSchema = byteString(1024).refine(v => v.length>0 && !v.
 export const attachmentRecordSchema = z.strictObject({id,sessionId:id,name:byteString(255).refine(v=>v.length>0 && !/[\/\\\x00]/.test(v)),size:count.max(20*1024*1024),sha256:hash,kind:z.enum(["text","binary"]),state:z.enum(["ready","sent"]),snapshotKey:id});
 export const attachmentViewSchema = attachmentRecordSchema.omit({snapshotKey:true});
 export const workspaceViewSchema = z.strictObject({id,sessionId:id,sourceLabel:byteString(255).nullable(),revision:count,entryCount:count.max(10000),totalBytes:count.max(1024**3)});
-export const workspaceRecordSchema = workspaceViewSchema.extend({sourceRoot:byteString(8192).nullable(),sourceIdentity:z.strictObject({device:z.string().regex(/^\d+$/),inode:z.string().regex(/^\d+$/)}).nullable().optional(),baselineKey:id,checkpointKey:id});
+export const workspaceRecordSchema = workspaceViewSchema.extend({sourceRoot:byteString(8192).nullable(),baselineKey:id,checkpointKey:id});
 export const fileEntrySchema = z.strictObject({relativePath:relativePathSchema,kind:z.enum(["file","directory"]),size:count.max(100*1024*1024),sha256:hash.nullable()}).refine(v=>v.kind==="directory"?v.size===0&&v.sha256===null:v.sha256!==null,"文件类型信息不一致");
 export const fileListPageSchema = z.strictObject({entries:z.array(fileEntrySchema).max(100),nextCursor:id.nullable()});
 export const fileReadSchema = z.strictObject({text:byteString(65536),offset:count,nextOffset:count,remainingBytes:count,truncated:z.boolean()});

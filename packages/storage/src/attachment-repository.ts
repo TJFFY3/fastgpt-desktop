@@ -4,7 +4,6 @@ import type { SessionRepository } from "./session-repository";
 import { namespaceKey } from "./namespace";
 export class AttachmentRepository {
   constructor(private db:Database,private sessions:SessionRepository) {}
-  retainedSnapshotKeys():string[]{return this.db.raw.prepare("SELECT data FROM attachments").all().map(row=>attachmentRecordSchema.parse(JSON.parse(row.data as string)).snapshotKey);}
   list(n:Namespace,sid:string):AttachmentRecord[] {
     this.sessions.get(n,sid);
     return this.db.raw.prepare("SELECT data FROM attachments WHERE namespace_key=? AND session_id=? ORDER BY rowid").all(namespaceKey(n),sid).map(r=>attachmentRecordSchema.parse(JSON.parse(r.data as string)));

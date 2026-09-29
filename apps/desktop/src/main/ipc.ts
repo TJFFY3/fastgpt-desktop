@@ -15,7 +15,6 @@ import {
 } from "../../../../packages/storage/src/index";
 import type { ProviderService } from "./provider-service";
 import type { AgentService } from "./agent-service";
-import type { SessionLifecycle } from "./session-lifecycle";
 const id = z.string().min(1).max(512),
   empty = z.strictObject({}),
   byId = z.strictObject({ id });
@@ -101,7 +100,6 @@ export function registerIpc(
     window: () => Sender;
     devOrigin?: string;
     beforeRunStart?: () => Promise<void>;
-    lifecycle?:Pick<SessionLifecycle,"remove">;
   },
 ) {
   const { store, providers, agents } = services;
@@ -138,8 +136,21 @@ export function registerIpc(
             data = store.sessions.messages(n, value.id);
             break;
           case "sessions:remove": {
-            if(!services.lifecycle)throw new AppError("SERVICE_UNAVAILABLE","会话资源管理尚未初始化");
-            data=await services.lifecycle.remove(n,value.id);
+            const active = store.runs
+              .list(n, value.id)
+              .filter((r) => activeStatuses.includes(r.status));
+            await Promise.all(active.map((r) => agents.cancel(n, r.id)));
+            const deadline = Date.now() + 3000;
+            while (
+              store.runs
+                .list(n, value.id)
+                .some((r) => activeStatuses.includes(r.status))
+            ) {
+              if (Date.now() > deadline)
+                throw new AppError("RUN_ACTIVE", "任务尚未停止，请稍后重试");
+              await new Promise((r) => setTimeout(r, 25));
+            }
+            data = store.sessions.remove(n, value.id);
             break;
           }
           case "runs:list":

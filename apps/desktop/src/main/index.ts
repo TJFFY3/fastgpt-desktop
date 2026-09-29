@@ -5,12 +5,9 @@ import {
   safeStorage,
   utilityProcess,
   session,
-  dialog,
-  systemPreferences,
 } from "electron";
-import { join, isAbsolute, resolve } from "node:path";
-import { mkdirSync, existsSync } from "node:fs";
-import { homedir } from "node:os";
+import { join, isAbsolute } from "node:path";
+import { mkdirSync } from "node:fs";
 import { openStore } from "../../../../packages/storage/src/index";
 import { SecretStore } from "./credentials";
 import { ProviderService } from "./provider-service";
@@ -21,14 +18,6 @@ import { createBuiltinTools } from "./tool-gateway";
 import { createWindow } from "./window";
 import { installProtocol } from "./protocol";
 import { registerIpc } from "./ipc";
-import { createFeatureServices } from "./feature-services";
-import { registerAttachmentHandlers } from "./ipc/attachment-handlers";
-import { registerWorkspaceHandlers } from "./ipc/workspace-handlers";
-import { registerSpeechHandlers } from "./ipc/speech-handlers";
-import { MediaPermissionService } from "./speech/media-permissions";
-import { SessionLifecycle } from "./session-lifecycle";
-import { registerApprovalHandlers } from "./ipc/approval-handlers";
-import { registerWorkspaceTools } from "./tools/workspace-tools";
 protocol.registerSchemesAsPrivileged([
   {
     scheme: "app",
@@ -48,7 +37,6 @@ if (__TEST_BUILD__ && process.env.FASTGPT_DESKTOP_TEST_DATA_DIR) {
   app.setPath("userData", path);
 }
 app.setName("FastGPT Desktop");
-if(__TEST_BUILD__&&process.env.FASTGPT_DESKTOP_TEST_FAKE_AUDIO==="1")app.commandLine.appendSwitch("use-fake-device-for-media-stream");
 // Only the owner may recover runs or write this user-data store.
 if (!app.requestSingleInstanceLock()) app.quit();
 else
@@ -60,6 +48,7 @@ else
       );
       session.defaultSession.setPermissionCheckHandler(() => false);
       const store = openStore(join(app.getPath("userData"), "fastgpt.sqlite"));
+      store.runs.recoverInterrupted();
       const secrets = new SecretStore(store.credentials, {
         isAvailable: () =>
           __TEST_BUILD__
@@ -86,43 +75,28 @@ else
         }),
       );
       let agents: AgentService;
-      let lifecycle:SessionLifecycle;
-      const principal = new PrincipalService((n) => lifecycle.revokeNamespace(n));
+      const principal = new PrincipalService((n) => agents.cancelNamespace(n));
       const window = await createWindow(join(__dirname, "../preload/index.js"));
-      const features=createFeatureServices({store,secrets,dataDirectory:app.getPath("userData"),helperPath:app.isPackaged?join(process.resourcesPath,"safe-files/safe-files"):join(app.getAppPath(),"native-build/safe-files"),principal:()=>principal.current(),window:()=>window.webContents.id,
-        dockerExecutable:process.platform==="darwin"?[join(homedir(),".docker/bin/docker"),"/usr/local/bin/docker"].find(p=>existsSync(p))??"/usr/local/bin/docker":process.platform==="win32"?"C:\\Program Files\\Docker\\Docker\\resources\\bin\\docker.exe":"/usr/bin/docker",
-        imageDirectory:app.isPackaged?join(process.resourcesPath,"sandbox-image"):resolve(app.getAppPath(),"../../packages/sandbox/image"),persistEvent:(context,event)=>agents.emit(context,event),
-        pickWorkspace:async()=>{const result=await dialog.showOpenDialog(window,{title:"选择工作目录（先预览，不会上传）",properties:["openDirectory"]});return result.canceled?null:result.filePaths[0]??null;},
-        confirmExport:async(kind,paths)=>(await dialog.showMessageBox(window,{type:"warning",title:kind==="remove_backups"?"永久删除备份":"确认本地文件操作",message:kind==="delete"?"确认删除以下源文件？":kind==="restore"?"确认从备份恢复以下文件？":kind==="remove_backups"?"确认永久删除以下备份？删除后无法通过应用恢复。":"确认逐文件写入以下目标？",detail:paths.join("\n")+"\n覆盖和删除前会保留独立备份。操作不是整目录事务，请暂停其他程序对此目录的写入。",buttons:["确认","取消"],defaultId:1,cancelId:1})).response===0,
-      });
       app.on("second-instance", () => {
         if (window.isDestroyed()) return;
         if (window.isMinimized()) window.restore();
         window.show();
         window.focus();
       });
-      const tools=createBuiltinTools();registerWorkspaceTools(tools,{workspace:features.workspaces,sandbox:features.sandbox,approvals:features.approvals,store,persistEvent:(context,event)=>agents.emit(context,event)});
       agents = new AgentService(
         store,
         providers,
         supervisor,
-        tools,
+        createBuiltinTools(),
         () => principal.current(),
         (e) => {
           if (!window.isDestroyed()) window.webContents.send("run:event", e);
         },
-        (n,request,profile,tools)=>features.context.assembleContext(n,request.sessionId,request.text,request.attachmentIds,profile,tools),
-        features.approvals,
       );
       const devUrl = __DEV_BUILD__
         ? process.env.ELECTRON_RENDERER_URL
         : undefined;
       const devOrigin = devUrl ? new URL(devUrl).origin : undefined;
-      const media=new MediaPermissionService({speech:features.speech,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,consent:()=>__TEST_BUILD__&&process.env.FASTGPT_DESKTOP_TEST_FAKE_AUDIO==="1"?Promise.resolve(true):process.platform==="darwin"?systemPreferences.askForMediaAccess("microphone"):Promise.resolve(true)});
-      lifecycle=new SessionLifecycle({store,agents,supervisor,features,media,principal:()=>principal.current(),ownsInstance:()=>app.hasSingleInstanceLock()});
-      await lifecycle.recover();
-      session.defaultSession.setPermissionCheckHandler((wc,permission,origin,details)=>media.check(wc,permission,origin,details));
-      session.defaultSession.setPermissionRequestHandler((wc,permission,callback,details)=>media.request(wc,permission,callback,details));
       // A bounded test-only delay reproduces asynchronous keyring/start races.
       const testStartDelay = __TEST_BUILD__
         ? Math.min(
@@ -137,7 +111,6 @@ else
         store,
         providers,
         agents,
-        lifecycle,
         principal: () => principal.current(),
         window: () => window.webContents,
         devOrigin,
@@ -145,13 +118,6 @@ else
           ? () => new Promise((resolve) => setTimeout(resolve, testStartDelay))
           : undefined,
       });
-      registerAttachmentHandlers(ipcMain,{attachments:features.attachments,grants:features.grants,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,
-        pick:async()=>{const result=await dialog.showOpenDialog(window,{title:"添加附件（只创建本地副本）",properties:["openFile","multiSelections"]});return result.canceled?[]:result.filePaths;},
-        confirmDrop:async paths=>(await dialog.showMessageBox(window,{type:"question",title:"确认导入文件",message:"将以下文件复制到本会话的隔离工作区？",detail:paths.join("\n")+"\n这里只创建本地副本，发送消息时才会传给模型。",buttons:["取消","导入副本"],defaultId:0,cancelId:0})).response===1,
-      });
-      registerWorkspaceHandlers(ipcMain,{workspaces:features.workspaces,exports:features.exports,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
-      registerSpeechHandlers(ipcMain,{speech:features.speech,media,principal:()=>principal.current(),window:()=>window.webContents,devOrigin});
-      registerApprovalHandlers(ipcMain,{approvals:features.approvals,sandbox:features.sandbox,store,principal:()=>principal.current(),window:()=>window.webContents,devOrigin,dataDirectory:app.getPath("userData"),imagePreparation:features.imagePreparation});
       if (devUrl) await window.loadURL(devUrl);
       else {
         await installProtocol(join(__dirname, "../renderer"));
@@ -162,9 +128,7 @@ else
         if (quitting) return;
         event.preventDefault();
         quitting = true;
-        void lifecycle.shutdown().catch(()=>{console.error("Owned resource cleanup remains pending; retry records retained.");}).finally(() => {
-          agents.dispose();
-          features.exports.dispose();
+        void supervisor.shutdown().finally(() => {
           secrets.clearSessionOnly();
           store.close();
           app.quit();

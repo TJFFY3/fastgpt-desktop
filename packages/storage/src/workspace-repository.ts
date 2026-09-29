@@ -4,7 +4,6 @@ import type { SessionRepository } from "./session-repository";
 import { namespaceKey } from "./namespace";
 export class WorkspaceRepository {
   constructor(private db:Database,private sessions:SessionRepository) {}
-  retainedSnapshotKeys():string[]{return this.db.raw.prepare("SELECT data FROM workspaces").all().flatMap(row=>{const w=workspaceRecordSchema.parse(JSON.parse(row.data as string));return [w.baselineKey,w.checkpointKey];});}
   getForSession(n:Namespace,sid:string):WorkspaceRecord|null {
     this.sessions.get(n,sid);
     const r=this.db.raw.prepare("SELECT data FROM workspaces WHERE namespace_key=? AND session_id=?").get(namespaceKey(n),sid);

@@ -8,7 +8,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <strings.h>
 #include <stdint.h>
 #include <inttypes.h>
 #include <signal.h>
@@ -88,36 +87,25 @@ static void json_string(const char *s) {
   putchar('"');for(const unsigned char *p=(const unsigned char*)s;*p;p++) {if(*p=='"'||*p=='\\') {putchar('\\');putchar(*p);} else if(*p<32) printf("\\u%04x",*p);else putchar(*p);}putchar('"');
 }
 static int64_t number(const char *s) {char *end;errno=0;int64_t n=strtoll(s,&end,10);if(errno||*end||n<0) fail("INVALID_INPUT");return n;}
-static int entries=0,workspace_scan=0,visited=0;static int64_t total=0,maxentries,maxfile,maxtotal;
-static int excluded_name(const char *name) {
-  const char *names[]={".git","node_modules","dist","build",".next",".cache",".ssh",".aws",".azure",".config",".kube",".npm",".gnupg",".codex",".attachments",NULL};
-  for(int i=0;names[i];i++)if(!strcasecmp(name,names[i]))return 1;
-  if(!strncasecmp(name,".env",4))return 1;
-  const char *keys[]={"id_rsa","id_ed25519","credentials","token",NULL};
-  for(int i=0;keys[i];i++){size_t n=strlen(keys[i]);if(!strncasecmp(name,keys[i],n)&&(!name[n]||name[n]=='.'))return 1;}
-  const char *ext=strrchr(name,'.');return ext&&(!strcasecmp(ext,".pem")||!strcasecmp(ext,".key")||!strcasecmp(ext,".p12")||!strcasecmp(ext,".pfx"));
-}
+static int entries=0;static int64_t total=0,maxentries,maxfile,maxtotal;
 static void scan(int dir,const char *prefix) {
   struct stat before;if(fstat(dir,&before)) fail("SAFE_FILES_FAILED");
   DIR *stream=fdopendir(dup(dir));if(!stream) fail("SAFE_FILES_FAILED");struct dirent *entry;
   while((entry=readdir(stream))) {
     if(!strcmp(entry->d_name,".")||!strcmp(entry->d_name,"..")) continue;
     char path[1025];if(snprintf(path,sizeof(path),"%s%s%s",prefix,*prefix?"/":"",entry->d_name)>1024) fail("UNSAFE_PATH");path_ok(path);
-    if(workspace_scan&&++visited>20000)fail("WORKSPACE_LIMIT");
-    if(workspace_scan&&excluded_name(entry->d_name)){printf("{\"excluded\":");json_string(path);printf("}\n");continue;}
     if(++entries>maxentries) fail("WORKSPACE_LIMIT");
     struct stat s;if(fstatat(dir,entry->d_name,&s,AT_SYMLINK_NOFOLLOW)) fail("SOURCE_CHANGED");
     if(s.st_dev!=before.st_dev || (!S_ISDIR(s.st_mode)&&!S_ISREG(s.st_mode)) || (S_ISREG(s.st_mode)&&s.st_nlink!=1)) fail("UNSAFE_PATH");
     if(S_ISREG(s.st_mode) && (s.st_size>maxfile || (total+=s.st_size)>maxtotal)) fail("WORKSPACE_LIMIT");
-    if(workspace_scan)printf("{\"entry\":");printf("{\"relativePath\":");json_string(path);
+    printf("{\"relativePath\":");json_string(path);
     if(S_ISDIR(s.st_mode)) {
-      printf(",\"kind\":\"directory\",\"size\":0,\"sha256\":null}");if(workspace_scan)printf(",\"fingerprint\":null}");printf("\n");
+      printf(",\"kind\":\"directory\",\"size\":0,\"sha256\":null}\n");
       int child=openat(dir,entry->d_name,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);if(child<0) fail("UNSAFE_PATH");scan(child,path);close(child);
     } else {
       int fd=input_file(dir,entry->d_name);struct stat version=regular(fd);char hash[65];digest_copy(fd,-1,maxfile,hash);unchanged(fd,version);
       struct stat named;if(fstatat(dir,entry->d_name,&named,AT_SYMLINK_NOFOLLOW)||!same(version,named)) fail("SOURCE_CHANGED");close(fd);
-      printf(",\"kind\":\"file\",\"size\":%jd,\"sha256\":\"%s\"}",(intmax_t)version.st_size,hash);
-      if(workspace_scan){printf(",\"fingerprint\":");fingerprint(version,hash);printf("}");}printf("\n");
+      printf(",\"kind\":\"file\",\"size\":%jd,\"sha256\":\"%s\"}\n",(intmax_t)version.st_size,hash);
     }
   }
   closedir(stream);struct stat after;if(fstat(dir,&after)||MT(before)!=MT(after)||CT(before)!=CT(after)) fail("SOURCE_CHANGED");
@@ -132,29 +120,12 @@ static void stable_parent(int root,const char *path,int dir,const char *rootpath
   int currentroot=absolute_dir(rootpath);
   if(fstat(again,&a)||fstat(dir,&b)||a.st_dev!=b.st_dev||a.st_ino!=b.st_ino||fstat(currentroot,&now)||now.st_dev!=root_before.st_dev||now.st_ino!=root_before.st_ino) fail("SOURCE_CHANGED");close(again);close(currentroot);
 }
-static int inspect_parents(int root,const char *path,int create,struct stat roots) {
-  path_ok(path);char *copy=strdup(path),*last=strrchr(copy,'/'),*save=NULL;int fd=dup(root);if(!copy||fd<0)fail("SAFE_FILES_FAILED");if(!last){free(copy);return fd;}*last=0;
-  for(char *p=strtok_r(copy,"/",&save);p;p=strtok_r(NULL,"/",&save)) {
-    int next=openat(fd,p,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);
-    if(next<0&&errno==ENOENT&&create){if(mkdirat(fd,p,0700)&&errno!=EEXIST)fail("SAFE_FILES_FAILED");if(fsync(fd))fail("SAFE_FILES_FAILED");next=openat(fd,p,O_RDONLY|O_DIRECTORY|O_NOFOLLOW|O_CLOEXEC);}
-    if(next<0){if(errno==ENOENT&&!create){close(fd);free(copy);return -1;}fail("UNSAFE_PATH");}
-    struct stat s;if(fstat(next,&s)||s.st_dev!=roots.st_dev)fail("UNSAFE_PATH");close(fd);fd=next;
-  }free(copy);return fd;
-}
 int main(int argc,char **argv) {
   umask(077);signal(SIGTERM,interrupted);signal(SIGINT,interrupted);if(argc<5) fail("INVALID_INPUT");
   int root=absolute_dir(argv[2]);struct stat roots;if(fstat(root,&roots)) fail("SAFE_FILES_FAILED");
   if((uintmax_t)roots.st_dev!=(uintmax_t)number(argv[3])||(uintmax_t)roots.st_ino!=(uintmax_t)number(argv[4])) fail("SOURCE_CHANGED");
-  if(!strcmp(argv[1],"scan")||!strcmp(argv[1],"workspace-scan")) {if(argc!=8) fail("INVALID_INPUT");workspace_scan=!strcmp(argv[1],"workspace-scan");maxentries=number(argv[5]);maxfile=number(argv[6]);maxtotal=number(argv[7]);scan(root,"");int again=absolute_dir(argv[2]);struct stat now;if(fstat(again,&now)||now.st_dev!=roots.st_dev||now.st_ino!=roots.st_ino)fail("SOURCE_CHANGED");return 0;}
-  if(argc<6) fail("INVALID_INPUT");
-  if(!strcmp(argv[1],"parents")||!strcmp(argv[1],"fingerprint")){if(argc!=6)fail("INVALID_INPUT");int inspected=inspect_parents(root,argv[5],!strcmp(argv[1],"parents"),roots);int again=absolute_dir(argv[2]);struct stat now;if(fstat(again,&now)||now.st_dev!=roots.st_dev||now.st_ino!=roots.st_ino)fail("SOURCE_CHANGED");close(again);if(inspected>=0)close(inspected);if(!strcmp(argv[1],"parents"))return 0;if(inspected<0){printf("null");return 0;}}
-  char *name;int dir=parent(root,argv[5],&name);
-  if(!strcmp(argv[1],"fingerprint")) {
-    if(argc!=6) fail("INVALID_INPUT");struct stat named;
-    if(fstatat(dir,name,&named,AT_SYMLINK_NOFOLLOW)) {if(errno!=ENOENT)fail("UNSAFE_PATH");stable_parent(root,argv[5],dir,argv[2],roots);printf("null");return 0;}
-    int in=input_file(dir,name);struct stat s=regular(in);char hash[65];digest_copy(in,-1,MAXFILE,hash);unchanged(in,s);
-    if(fstatat(dir,name,&named,AT_SYMLINK_NOFOLLOW)||!same(named,s))fail("SOURCE_CHANGED");stable_parent(root,argv[5],dir,argv[2],roots);fingerprint(s,hash);return 0;
-  }
+  if(!strcmp(argv[1],"scan")) {if(argc!=8) fail("INVALID_INPUT");maxentries=number(argv[5]);maxfile=number(argv[6]);maxtotal=number(argv[7]);scan(root,"");return 0;}
+  if(argc<6) fail("INVALID_INPUT");char *name;int dir=parent(root,argv[5],&name);
   if(!strcmp(argv[1],"copy")) {
     if(argc!=8) fail("INVALID_INPUT");int in=input_file(dir,name);struct stat s=regular(in);if(s.st_size>number(argv[7])) fail("WORKSPACE_LIMIT");
     char *target;int destination=absolute_parent(argv[6],&target),out=openat(destination,target,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);if(out<0) fail("SAFE_FILES_FAILED");
@@ -169,14 +140,12 @@ int main(int argc,char **argv) {
     unchanged(in,s);stable_parent(root,argv[5],dir,argv[2],roots);write_all(STDOUT_FILENO,buffer,(size_t)n);return 0;
   }
   int deleting=!strcmp(argv[1],"delete");if(!deleting&&strcmp(argv[1],"replace")) fail("INVALID_INPUT");
-  if(argc!=11&&argc!=12) fail("INVALID_INPUT");path_ok(argv[9]);path_ok(argv[10]);
+  if(argc!=11) fail("INVALID_INPUT");path_ok(argv[9]);path_ok(argv[10]);
   int previous=-1;struct stat target;
   if(!strcmp(argv[7],"absent")) {if(!fstatat(dir,name,&target,AT_SYMLINK_NOFOLLOW)||errno!=ENOENT) fail("FILE_CONFLICT");if(deleting) fail("INVALID_INPUT");}
   else {previous=input_file(dir,name);check_expected(previous,argv[7]);target=regular(previous);}
   int backups=absolute_dir(argv[8]);char backuphash[65];
-  if(previous>=0) {int out=openat(backups,argv[9],O_WRONLY|O_NOFOLLOW|O_CLOEXEC|(argc==11?O_CREAT|O_EXCL:0),0600);if(out<0) fail("SAFE_FILES_FAILED");
-    if(argc==12){struct stat b=regular(out);char owner[128];snprintf(owner,sizeof(owner),"%ju:%ju",(uintmax_t)b.st_dev,(uintmax_t)b.st_ino);if(b.st_size||strcmp(owner,argv[11]))fail("SOURCE_CHANGED");}
-    track(backups,out,argv[9]);digest_copy(previous,out,MAXFILE,backuphash);unchanged(previous,target);if(fsync(out)) fail("SAFE_FILES_FAILED");close(out);}
+  if(previous>=0) {int out=openat(backups,argv[9],O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);if(out<0) fail("SAFE_FILES_FAILED");track(backups,out,argv[9]);digest_copy(previous,out,MAXFILE,backuphash);unchanged(previous,target);if(fsync(out)) fail("SAFE_FILES_FAILED");close(out);}
   int incoming=-1;struct stat replacement;char incominghash[65];
   if(!deleting) {
     char *source;int sourcedir=absolute_parent(argv[6],&source),in=input_file(sourcedir,source);struct stat input=regular(in);

@@ -1,13 +1,10 @@
 import type { ApprovalDecision, RunEvent, RunRecord } from "../../../../../packages/shared/src/index";
 import { useRunTimer } from "../hooks/useRunTimer";
 import { statusLabel } from "./RunDetails";
-import { ApprovalCard } from "./ApprovalCard";
-import { useCommandTimer } from "../hooks/useCommandTimer";
-function CommandTrace({runId,start,done,output,terminal}:{runId:string;start:Extract<RunEvent,{type:"command_started"}>;done?:Extract<RunEvent,{type:"command_finished"}>;output:RunEvent[];terminal:boolean}){const elapsed=useCommandTimer(runId,start.id,terminal,done?.elapsedMs);return <section className="trace-command"><div>命令 · {start.cwd}</div><pre>{start.command}</pre><pre data-testid="command-output">{output.map(v=>v.type==="command_output"?v.text:"").join("")}</pre><small data-testid="command-elapsed">{done?`退出码 ${done.exitCode??"未知"} · ${formatDuration(elapsed)} · ${done.reason}${done.truncated?" · 输出已截断":""}`:terminal?`已中断 / 结果未知 · ${formatDuration(elapsed)}`:`执行中 · ${formatDuration(elapsed)}`}</small></section>;}
 export function formatDuration(ms:number):string {
   const seconds=Math.max(0,Math.floor(ms/1000));return seconds<60?`${seconds} 秒`:`${Math.floor(seconds/60)} 分 ${seconds%60} 秒`;
 }
-export function RunTrace({run,events,latest=false,onOpen,onDecide}:{run:RunRecord;events:RunEvent[];latest?:boolean;onOpen?():void;onDecide?(id:string,decision:ApprovalDecision):Promise<void>}) {
+export function RunTrace({run,events,latest=false,onOpen,onDecide}:{run:RunRecord;events:RunEvent[];latest?:boolean;onOpen?():void;onDecide?(id:string,decision:ApprovalDecision):void}) {
   const status=events.flatMap(e=>e.type==="status"?[e.status]:[]).at(-1) ?? run.status;
   const elapsed=useRunTimer({...run,status});
   const reasoning=events.flatMap(e=>e.type==="reasoning_delta"?[e.text]:[]).join("");
@@ -23,11 +20,11 @@ export function RunTrace({run,events,latest=false,onOpen,onDecide}:{run:RunRecor
       }
       if(e.type==="command_started") {
         const done=events.find(v=>v.type==="command_finished"&&v.id===e.id),output=events.filter(v=>v.type==="command_output"&&v.id===e.id);
-        return <CommandTrace key={e.seq} runId={run.id} start={e} done={done?.type==="command_finished"?done:undefined} output={output} terminal={!["running","waiting_approval","cancelling"].includes(status)}/>;
+        return <section className="trace-command" key={e.seq}><div>命令 · {e.cwd}</div><pre>{e.command}</pre><pre data-testid="command-output">{output.map(v=>v.type==="command_output"?v.text:"").join("")}</pre><small>{done?.type==="command_finished"?`退出码 ${done.exitCode ?? "未知"} · ${formatDuration(done.elapsedMs)} · ${done.reason}${done.truncated?" · 输出已截断":""}`:["running","cancelling"].includes(status)?"执行中":"已中断 / 结果未知"}</small></section>;
       }
       if(e.type==="approval_requested") {
         const decision=events.find(v=>v.type==="approval_decided"&&v.approvalId===e.approval.id);
-        return <ApprovalCard key={e.seq} approval={e.approval} decision={decision?.type==="approval_decided"?decision.decision:undefined} active={status==="waiting_approval"} onDecide={onDecide}/>;
+        return <section className="trace-approval" key={e.seq}><strong>待确认操作</strong><pre>{e.approval.command ?? e.approval.relativePath ?? e.approval.arguments}</pre><p>目的地：{e.approval.destinationLabel}</p>{decision?.type==="approval_decided"?<span>{decision.decision}</span>:onDecide&&<><button onClick={()=>onDecide(e.approval.id,"approved")}>批准本次</button><button onClick={()=>onDecide(e.approval.id,"rejected")}>拒绝</button></>}</section>;
       }
       if(e.type==="error") return <p className="trace-error" key={e.seq}>{e.code}：{e.message}</p>;
       if(e.type==="workspace_checkpoint") return <p className="trace-hint" key={e.seq}>工作区检查点已保存 · 版本 {e.revision}</p>;

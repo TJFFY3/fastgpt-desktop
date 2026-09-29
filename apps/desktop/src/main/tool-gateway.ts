@@ -12,7 +12,6 @@ import {
   enforceToolPolicy,
 } from "../../../../packages/agent-core/src/index";
 import type { RunRepository } from "../../../../packages/storage/src/index";
-import { canonicalArguments, type ApprovalService } from "./tools/approval-service";
 export function createBuiltinTools() {
   const registry = new ToolRegistry(),
     args = z.strictObject({ timezone: z.string().max(128).optional() });
@@ -64,7 +63,6 @@ export class ToolGateway implements ToolExecutor {
   constructor(
     private runs: RunRepository,
     private registry: ToolRegistry,
-    private approvals?:ApprovalService,
   ) {}
   async execute(
     call: ToolCall,
@@ -74,21 +72,19 @@ export class ToolGateway implements ToolExecutor {
     throwIfAborted(signal);
     const tool = this.registry.get(call.name);
     if (!tool) throw new AppError("PERMISSION_DENIED", "工具未注册");
-    if(!tool.approval||!this.approvals)enforceToolPolicy(tool);
+    enforceToolPolicy(tool);
     let value: unknown;
     try {
       value = JSON.parse(call.arguments);
     } catch {
       throw new AppError("INVALID_INPUT", "工具参数不是有效 JSON");
     }
-    const args = Object.freeze(tool.validate(value));
-    const boundCall=Object.freeze({...call,arguments:canonicalArguments(JSON.stringify(args))});
-    const run=this.runs.get(context.namespace,context.runId);if(run.sessionId!==context.sessionId)throw new AppError("NOT_FOUND","工具会话归属无效");
+    const args = tool.validate(value);
     throwIfAborted(signal);
     const reservation = this.runs.reserveToolCall(
       context.namespace,
       context.runId,
-      boundCall,
+      call,
     );
     if (reservation === "completed")
       return this.runs.toolResult(context.namespace, context.runId, call.id)!;
@@ -97,10 +93,7 @@ export class ToolGateway implements ToolExecutor {
         "TOOL_UNRESOLVED",
         "工具之前的执行结果未知，已阻止自动重复执行",
       );
-    let result:ToolResult;
-    if(tool.approval){if(!this.approvals)throw new AppError("PERMISSION_DENIED","审批服务未启用");const decision=await this.approvals.request(context,boundCall,tool.approval(args,context),signal);throwIfAborted(signal);if(decision==="rejected")result={content:"PERMISSION_DENIED: 用户拒绝了本次操作，请解释或选择其他方案；不得自动重复被拒绝操作。",isError:true};else {this.approvals.consume(context,boundCall);enforceToolPolicy(tool,true);result=await tool.execute(args,context,signal,boundCall);}}
-    else result=await tool.execute(args,context,signal,boundCall);
-    throwIfAborted(signal);
+    let result = await tool.execute(args, context, signal);
     if (Buffer.byteLength(result.content) > 1024 * 1024)
       result = {
         content: "工具结果超过 1 MiB 限制，已拒绝返回。",

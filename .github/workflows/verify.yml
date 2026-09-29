@@ -1,13 +1,5 @@
 name: Verify desktop foundation
-on:
-  push:
-  pull_request:
-  workflow_dispatch:
-    inputs:
-      run_docker:
-        description: Prepare trusted image and run real Docker/Electron integration
-        type: boolean
-        default: false
+on: [push, pull_request]
 permissions:
   contents: read
 jobs:
@@ -24,23 +16,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - run: npm run build:safe-files
       - run: npm run typecheck
       - run: npm test
       - run: npm run build
-  docker-integration:
-    if: github.event_name == 'workflow_dispatch' && inputs.run_docker
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: npm
-      - run: sudo apt-get update && sudo apt-get install -y libssl-dev xvfb libasound2t64 libgtk-3-0 libnss3
-      - run: npm ci
-      - run: npm run build:safe-files
-      - run: docker info
-      - run: npm run prepare:sandbox
-      - run: npm run test:sandbox
-      - run: xvfb-run -a npm run test:e2e
+      - run: npm run test:e2e
+        if: runner.os == 'macOS'

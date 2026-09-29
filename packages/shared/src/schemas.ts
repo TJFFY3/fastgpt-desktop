@@ -155,7 +155,7 @@ export const workerReplySchema = z.discriminatedUnion("type", [
     type: z.literal("event"),
     runId: id,
     requestId: id,
-    event: agentEventSchema.refine(event=>!["approval_requested","approval_decided","command_started","command_output","command_finished","workspace_checkpoint"].includes(event.type),"此事件仅允许主进程发布"),
+    event: agentEventSchema,
   }),
   z.strictObject({
     type: z.literal("tool_request"),

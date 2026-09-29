@@ -85,15 +85,3 @@ it("aborts first and force-stops an unresponsive worker after two seconds", asyn
     vi.useRealTimers();
   }
 });
-it("worker exit aborts approval/tool waits before draining the persistence queue",async()=>{
-  const child=new Child(),worker=new WorkerSupervisor(()=>child);let release!:(r:{content:string;isError:boolean})=>void,aborted=false,exits=0;const pending=new Promise<{content:string;isError:boolean}>(r=>{release=r;});
-  worker.start(input,"key",async()=>{},()=>pending,async()=>{exits++;},()=>{aborted=true;release({content:"cancelled",isError:true});});
-  child.emit("message",{type:"tool_request",runId:"run",requestId:"tool",call:{id:"call",name:"workspace_exec",arguments:"{}"}});await Promise.resolve();child.emit("exit",1);
-  await vi.waitFor(()=>expect(exits).toBe(1));expect(aborted).toBe(true);await worker.shutdown();
-});
-it("exit cannot wait indefinitely for a tool promise that ignores cancellation",async()=>{
-  const child=new Child(),worker=new WorkerSupervisor(()=>child);let exits=0;
-  worker.start(input,"key",async()=>{},()=>new Promise(()=>{}),async()=>{exits++;});
-  child.emit("message",{type:"tool_request",runId:"run",requestId:"tool",call:{id:"call",name:"workspace_exec",arguments:"{}"}});await Promise.resolve();child.emit("exit",1);await vi.waitFor(()=>expect(exits).toBe(1));await worker.shutdown();
-});
-it("tools queued before exit but not yet started never execute after exit",async()=>{const child=new Child(),worker=new WorkerSupervisor(()=>child);let starts=0,exits=0;worker.start(input,"key",async()=>{},async()=>{starts++;return {content:"",isError:false};},async()=>{exits++;});child.emit("message",{type:"tool_request",runId:"run",requestId:"tool",call:{id:"call",name:"workspace_exec",arguments:"{}"}});child.emit("exit",1);await vi.waitFor(()=>expect(exits).toBe(1));expect(starts).toBe(0);});

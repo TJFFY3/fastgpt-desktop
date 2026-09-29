@@ -9,4 +9,3 @@ native-build/
 .DS_Store
 *.log
 *.sqlite*
-__pycache__/

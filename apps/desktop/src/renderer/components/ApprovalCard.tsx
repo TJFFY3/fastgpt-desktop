@@ -1,7 +1,0 @@
-import { useState } from "react";
-import type { ApprovalDecision, ApprovalView } from "../../../../../packages/shared/src/index";
-export function ApprovalCard({approval,decision,active,onDecide}:{approval:ApprovalView;decision?:ApprovalDecision|"revoked";active:boolean;onDecide?(id:string,decision:ApprovalDecision):Promise<void>}) {
-  const [pending,setPending]=useState(false),[error,setError]=useState("");const state=decision??(active?approval.state:"revoked");
-  const decide=async(value:ApprovalDecision)=>{if(pending||!onDecide)return;setPending(true);setError("");try{await onDecide(approval.id,value);}catch(e){setError(String(e));}finally{setPending(false);}};
-  return <section className="trace-approval" data-state={state}><strong>{{file_read:"确认向模型发送文件内容",file_write:"确认写入隔离副本",command:"确认执行容器命令"}[approval.kind]}</strong>{approval.relativePath&&<p>相对路径：<code>{approval.relativePath}</code></p>}{approval.command&&<pre>{approval.command}</pre>}<details open><summary>完整执行参数</summary><pre>{approval.arguments}</pre></details><p>目的地：{approval.destinationLabel}</p><p className="trace-hint">只批准本次调用。源目录不会自动写回；容器无网络、根目录只读，后台进程会被清理。</p>{state==="pending"&&onDecide?<div><button disabled={pending} onClick={()=>void decide("approved")}>批准本次</button><button disabled={pending} onClick={()=>void decide("rejected")}>拒绝</button></div>:<span>{{pending:"等待确认",approved:"已批准本次",rejected:"已拒绝",revoked:"授权已失效"}[state]}</span>}{error&&<p role="alert">{error}</p>}</section>;
-}

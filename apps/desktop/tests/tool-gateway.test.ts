@@ -1,3 +1,0 @@
-import { expect, test } from "vitest";
-import { workerReplySchema } from "../../../packages/shared/src/index";
-test("Worker cannot forge main-owned approvals, command timing or checkpoint events",()=>{for(const event of [{type:"command_started",id:"c",command:"harmless lie",cwd:"."},{type:"workspace_checkpoint",id:"c",workspaceId:"w",revision:2},{type:"approval_decided",approvalId:"a",decision:"approved"}])expect(workerReplySchema.safeParse({type:"event",runId:"r",requestId:"q",event}).success).toBe(false);expect(workerReplySchema.safeParse({type:"event",runId:"r",requestId:"q",event:{type:"reasoning_delta",text:"public provider thought"}}).success).toBe(true);});

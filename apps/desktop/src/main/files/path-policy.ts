@@ -11,9 +11,9 @@ export function assertNoPathCollisions(paths:string[]):void {
   const seen=new Set<string>();
   for(const path of paths) {const canonical=safeRelativePath(path).normalize("NFC").toLowerCase();if(seen.has(canonical)) throw new AppError("UNSAFE_PATH","文件名称大小写或规范化冲突");seen.add(canonical);}
 }
-export const defaultExcludedNames=[".git","node_modules","dist","build",".next",".cache",".ssh",".aws",".azure",".config",".kube",".npm",".gnupg",".codex",".attachments"];
+export const defaultExcludedNames=[".git","node_modules","dist","build",".next",".cache",".ssh",".aws",".azure",".config",".kube",".npm",".gnupg",".codex"];
 export function excludedWorkspacePath(relativePath:string):boolean {
-  return relativePath.split("/").some(part=>defaultExcludedNames.includes(part.toLowerCase()) || /^\.env/i.test(part) || /^(id_rsa|id_ed25519|credentials|token)(\.|$)/i.test(part) || /\.(pem|key|p12|pfx)$/i.test(part));
+  return relativePath.split("/").some(part=>defaultExcludedNames.includes(part.toLowerCase()) || /^\.env(?:\.|$)/i.test(part) || /^(id_rsa|id_ed25519|credentials|token)(\.|$)/i.test(part) || /\.(pem|key|p12|pfx)$/i.test(part));
 }
 export function assertWorkspaceRoot(root:string,credentialRoots:string[]):void {
   const path=resolve(root),home=resolve(homedir());

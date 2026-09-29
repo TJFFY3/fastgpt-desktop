@@ -9,14 +9,8 @@ import type {
   SessionPatch,
   SessionRecord,
 } from "./types";
-import type { RunStartOptions, RunTimingSnapshot, AttachmentApi, WorkspaceApi, ApprovalApi, SandboxApi, ExportApi,SpeechApi } from "./feature-types";
+import type { RunStartOptions, RunTimingSnapshot } from "./feature-types";
 export interface DesktopApi {
-  speech:SpeechApi;
-  exports:ExportApi;
-  attachments:AttachmentApi;
-  workspaces:WorkspaceApi;
-  approvals:ApprovalApi;
-  sandbox:SandboxApi;
   providers: {
     list(): Promise<ProviderView[]>;
     save(

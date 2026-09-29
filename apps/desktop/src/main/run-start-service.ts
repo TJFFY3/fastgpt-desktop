@@ -1,7 +1,6 @@
 import { AppError, modelSnapshotSchema, runStartSchema, type ChatMessage, type MessageRecord, type ModelProfile, type Namespace, type RunStartRequest, type ToolSpec } from "../../../../packages/shared/src/index";
 import { activeStatuses, namespaceKey, type Store } from "../../../../packages/storage/src/index";
 import type { ProviderService } from "./provider-service";
-import { assertContextBudget } from "../../../../packages/agent-core/src/index";
 
 /** Complete rounds only: never send partial responses or orphaned tool results. */
 export function modelHistory(records: MessageRecord[]): ChatMessage[] {
@@ -42,7 +41,7 @@ export class RunStartService {
     const resolved=await this.providers.resolve(n,profile.id);validate();
     if(resolved.profile.revision!==profile.revision) throw new AppError("CONFIG_CHANGED","模型配置已变化");
     const tools=profile.capabilities.tools ? this.tools() : [];
-    const messages=await this.prepareContext(n,request,profile,tools);validate();assertContextBudget(profile,messages,tools);
+    const messages=await this.prepareContext(n,request,profile,tools);validate();
     const snapshot=modelSnapshotSchema.parse({providerId:profile.id,revision:profile.revision,name:profile.name,baseUrl:profile.baseUrl,modelId:profile.modelId,capabilities:profile.capabilities,contextWindow:profile.contextWindow,maxOutputTokens:profile.maxOutputTokens,timeoutMs:profile.timeoutMs});
     let committed=false;
     return {profile,apiKey:resolved.apiKey,snapshot,messages,tools,commit:()=>this.store.transaction(()=>{

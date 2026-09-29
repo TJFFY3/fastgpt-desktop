@@ -9,7 +9,6 @@ import {
   type RunInput,
   type ToolCall,
   type ToolResult,
-  type ToolContext,
 } from "../../../../packages/shared/src/index";
 import {
   activeStatuses,
@@ -21,7 +20,6 @@ import type { ProviderService } from "./provider-service";
 import { ToolGateway } from "./tool-gateway";
 import { RunClock } from "./run-clock";
 import { RunStartService, type ContextPreparer } from "./run-start-service";
-import type { ApprovalService } from "./tools/approval-service";
 export { modelHistory } from "./run-start-service";
 export interface Supervisor {
   start(
@@ -30,7 +28,6 @@ export interface Supervisor {
     onEvent: (event: AgentEvent) => Promise<void>,
     onTool: (call: ToolCall) => Promise<ToolResult>,
     onExit: () => Promise<void>,
-    onStopping?:()=>void,
   ): void;
   cancel(runId: string): void;
   shutdown(): Promise<void>;
@@ -43,15 +40,9 @@ export class AgentService {
       controller: AbortController;
       partial: string;
       error: string | null;
-      cancelRequested:boolean;
     }
   >();
-  private epochs = new Map<string,number>();private disposed=false;private closed=false;
-  private sessionGuard?:(n:Namespace,sid:string)=>void;
-  private resourceStop?:(runId:string)=>Promise<void>;
-  configureLifecycle(guard:(n:Namespace,sid:string)=>void,stop:(runId:string)=>Promise<void>):void{if(this.sessionGuard)throw new AppError("INVALID_INPUT","运行生命周期已配置");this.sessionGuard=guard;this.resourceStop=stop;}
-  beginShutdown():void{this.closed=true;}
-  private emitters=new Map<string,(event:AgentEvent,trusted?:boolean)=>Promise<void>>();
+  private revoked = new Set<string>();
   private gateway: ToolGateway;
   private clock:RunClock;
   private starts:RunStartService;
@@ -63,44 +54,38 @@ export class AgentService {
     private principal: () => Namespace,
     private publish: (event: RunEvent) => void,
     prepareContext?:ContextPreparer,
-    approvals?:ApprovalService,
   ) {
-    this.gateway = new ToolGateway(store.runs, tools,approvals);
+    this.gateway = new ToolGateway(store.runs, tools);
     this.starts=new RunStartService(store,providers,principal,()=>tools.definitions(),prepareContext);
     this.clock=new RunClock((id,elapsed)=>{
       const state=this.running.get(id);if(state) store.runs.saveTiming(state.namespace,id,elapsed);
     },()=>performance.now(),(id)=>{
-      const state=this.running.get(id);if(state)state.cancelRequested=true;state?.controller.abort();supervisor.cancel(id);
+      const state=this.running.get(id);state?.controller.abort();supervisor.cancel(id);
     });
   }
   async start(n: Namespace, sessionId: string, text: string, options?:RunStartOptions) {
-    if(this.closed)throw new AppError("CANCELLED","应用正在退出");
-    this.sessionGuard?.(n,sessionId);const epoch=this.epochs.get(namespaceKey(n))??0;
     const request=runStartSchema.parse({sessionId,text,...(options ?? {attachmentIds:[]})});
     if (
-      this.closed ||
+      this.revoked.has(namespaceKey(n)) ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
     const prepared=await this.starts.prepare(n,request);
     if (
-      this.closed || (this.epochs.get(namespaceKey(n))??0)!==epoch ||
+      this.revoked.has(namespaceKey(n)) ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
-    this.sessionGuard?.(n,sessionId);
     const run = prepared.commit(),
       state = {
         namespace: n,
         controller: new AbortController(),
         partial: "",
         error: null as string | null,
-        cancelRequested:false,
       };
     this.running.set(run.id, state);
     this.clock.start(run.id);
-    const event = async (value: AgentEvent,trusted=false) => {
-      if(this.disposed)return;
+    const event = async (value: AgentEvent) => {
       const persisted = this.store.transaction(() => {
         let messageId:string|undefined;
         const current = this.store.runs.get(n, run.id);
@@ -109,13 +94,13 @@ export class AgentService {
         if (
           state.controller.signal.aborted &&
           value.type !== "status" &&
-          value.type !== "error"&&!(trusted&&(value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked"))
+          value.type !== "error"
         )
           return;
         if (value.type === "status") {
           const status =
             state.controller.signal.aborted && value.status === "completed"
-              ? state.cancelRequested?"cancelled":"interrupted"
+              ? "cancelled"
               : value.status;
           if(activeStatuses.includes(status)) this.clock.checkpoint(run.id);
           else this.clock.finish(run.id);
@@ -132,8 +117,7 @@ export class AgentService {
                 {runId:run.id},
               );
             state.partial = "";
-              this.running.delete(run.id);
-              this.emitters.delete(run.id);
+            this.running.delete(run.id);
           }
         } else if (value.type === "text_delta") state.partial += value.text;
         else if (value.type === "assistant_message") {
@@ -151,22 +135,18 @@ export class AgentService {
       });
       if (
         persisted &&
-        !this.closed &&
+        !this.revoked.has(namespaceKey(n)) &&
         namespaceKey(this.principal()) === namespaceKey(n)
       )
         this.publish(persisted);
     };
-    this.emitters.set(run.id,event);
     const onExit = async () => {
-      if(this.disposed)return;
-      await this.resourceStop?.(run.id);
-      if(this.disposed)return;
       const current = this.store.runs.get(n, run.id);
       if (activeStatuses.includes(current.status)) {
         state.error = "WORKER_EXITED";
         await event({
           type: "status",
-          status: state.cancelRequested ? "cancelled" : "interrupted",
+          status: state.controller.signal.aborted ? "cancelled" : "interrupted",
         });
       }
     };
@@ -191,7 +171,6 @@ export class AgentService {
           );
         },
         onExit,
-        ()=>state.controller.abort(),
       );
     } catch {
       state.error = "WORKER_START_FAILED";
@@ -203,17 +182,10 @@ export class AgentService {
     }
     return this.store.runs.get(n, run.id);
   }
-  async emit(context:ToolContext,value:AgentEvent):Promise<void>{
-    const n=context.namespace,run=this.store.runs.get(n,context.runId),state=this.running.get(run.id),emitter=this.emitters.get(run.id);
-    const terminalCleanup=value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked";
-    if(run.sessionId!==context.sessionId||!activeStatuses.includes(run.status)||!state||!emitter||state.controller.signal.aborted&&!terminalCleanup||this.disposed||namespaceKey(this.principal())!==namespaceKey(n))throw new AppError("PERMISSION_DENIED","当前运行不允许发布工具事件");
-    await emitter(value,true);
-  }
   async cancel(n: Namespace, runId: string) {
     const run = this.store.runs.get(n, runId);
     if (!activeStatuses.includes(run.status)) return;
     const state = this.running.get(runId);
-    if(state)state.cancelRequested=true;
     state?.controller.abort();
     this.clock.checkpoint(runId);
     if (run.status !== "cancelling") {
@@ -227,7 +199,7 @@ export class AgentService {
     this.supervisor.cancel(runId);
   }
   async cancelNamespace(n: Namespace) {
-    this.epochs.set(namespaceKey(n),(this.epochs.get(namespaceKey(n))??0)+1);
+    this.revoked.add(namespaceKey(n));
     await Promise.all(
       [...this.running.entries()]
         .filter(([, s]) => namespaceKey(s.namespace) === namespaceKey(n))
@@ -238,5 +210,5 @@ export class AgentService {
     const run=this.store.runs.get(n,runId),active=activeStatuses.includes(run.status);
     return {runId,active,elapsedMs:active && this.running.has(runId)?this.clock.elapsed(runId):run.elapsedMs};
   }
-  dispose():void {this.disposed=true;this.closed=true;this.clock.dispose();}
+  dispose():void {this.clock.dispose();}
 }
