@@ -1,6 +1,6 @@
-/** Provides the sse module for the desktop application. */
+/** Adapts provider-compatible requests and streaming responses to shared model contracts. */
 import { AppError, throwIfAborted } from '../../shared/src/index';
-/** Performs parse Sse for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export async function* parseSse(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
@@ -12,7 +12,7 @@ export async function* parseSse(
     event = 'message',
     lines: string[] = [],
     size = 0;
-  /** Performs cancel for this module. */
+  /** Releases managed state and prevents further use of the affected resource. */
   const cancel = () => {
     void reader.cancel().catch(() => {});
   };

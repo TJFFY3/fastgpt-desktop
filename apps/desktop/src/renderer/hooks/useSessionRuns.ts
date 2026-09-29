@@ -1,7 +1,7 @@
-/** Provides the use Session Runs module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RunEvent, RunRecord } from '../../../../../packages/shared/src/index';
-/** Performs use Session Runs for this module. */
+/** Provides the UI state and lifecycle integration consumed by this renderer feature. */
 export function useSessionRuns(sessionId: string | null) {
   const scope = useRef({ sessionId, generation: 0 });
   const [runs, setRuns] = useState<RunRecord[]>([]),

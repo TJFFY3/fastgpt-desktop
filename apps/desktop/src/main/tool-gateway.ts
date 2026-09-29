@@ -1,4 +1,4 @@
-/** Provides the tool gateway module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import { z } from 'zod';
 import {
   AppError,
@@ -10,7 +10,7 @@ import {
 } from '../../../../packages/shared/src/index';
 import { ToolRegistry, enforceToolPolicy } from '../../../../packages/agent-core/src/index';
 import type { RunRepository } from '../../../../packages/storage/src/index';
-/** Performs create Builtin Tools for this module. */
+/** Persists or updates state while maintaining this module’s data invariants. */
 export function createBuiltinTools() {
   const registry = new ToolRegistry(),
     args = z.strictObject({ timezone: z.string().max(128).optional() });
@@ -56,13 +56,13 @@ export function createBuiltinTools() {
   });
   return registry;
 }
-/** Coordinates tool Gateway responsibilities for this module. */
+/** Owns the module boundary represented by tool Gateway and coordinates its collaborators. */
 export class ToolGateway implements ToolExecutor {
   constructor(
     private runs: RunRepository,
     private registry: ToolRegistry,
   ) {}
-  /** Handles execute within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async execute(call: ToolCall, context: ToolContext, signal: AbortSignal): Promise<ToolResult> {
     throwIfAborted(signal);
     const tool = this.registry.get(call.name);

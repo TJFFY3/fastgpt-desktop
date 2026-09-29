@@ -1,8 +1,8 @@
-/** Provides the path policy module for the desktop application. */
+/** Enforces the main-process filesystem safety boundary for workspace artifacts. */
 import { AppError, relativePathSchema } from '../../../../../packages/shared/src/index';
 import { homedir } from 'node:os';
 import { resolve, parse, sep } from 'node:path';
-/** Performs safe Relative Path for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export function safeRelativePath(value: string): string {
   if (
     !relativePathSchema.safeParse(value).success ||
@@ -14,7 +14,7 @@ export function safeRelativePath(value: string): string {
     throw new AppError('UNSAFE_PATH', '文件路径不安全或名称有歧义');
   return value;
 }
-/** Performs assert No Path Collisions for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export function assertNoPathCollisions(paths: string[]): void {
   const seen = new Set<string>();
   for (const path of paths) {
@@ -39,7 +39,7 @@ export const defaultExcludedNames = [
   '.gnupg',
   '.codex',
 ];
-/** Performs excluded Workspace Path for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function excludedWorkspacePath(relativePath: string): boolean {
   return relativePath
     .split('/')
@@ -51,11 +51,11 @@ export function excludedWorkspacePath(relativePath: string): boolean {
         /\.(pem|key|p12|pfx)$/i.test(part),
     );
 }
-/** Performs assert Workspace Root for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export function assertWorkspaceRoot(root: string, credentialRoots: string[]): void {
   const path = resolve(root),
     home = resolve(homedir());
-  /** Performs within for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const within = (parent: string) => path === parent || path.startsWith(parent + sep);
   if (
     path === parse(path).root ||

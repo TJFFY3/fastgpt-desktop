@@ -1,8 +1,8 @@
-/** Provides the chat View module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { Fragment, useEffect, useRef } from 'react';
 import type { MessageRecord, RunEvent, RunRecord } from '../../../../../packages/shared/src/index';
 import { RunTrace } from './RunTrace';
-/** Performs chat View for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function ChatView({
   messages,
   events,
@@ -60,7 +60,7 @@ export function ChatView({
     if (m.runId) lastIndex.set(m.runId, i);
   });
   const liveRunId = events[0]?.runId;
-  /** Performs trace for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const trace = (r: RunRecord) => (
     <RunTrace
       key={r.id}

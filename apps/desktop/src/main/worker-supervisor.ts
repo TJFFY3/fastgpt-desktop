@@ -1,4 +1,4 @@
-/** Provides the worker supervisor module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import {
   asAppError,
   workerReplySchema,
@@ -9,14 +9,14 @@ import {
   type WorkerCommand,
 } from '../../../../packages/shared/src/index';
 import type { Supervisor } from './agent-service';
-/** Describes the worker Child contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface WorkerChild {
   postMessage(message: WorkerCommand): void;
   on(event: 'message', listener: (message: unknown) => void): unknown;
   on(event: 'exit', listener: (code: number) => void): unknown;
   kill(): boolean;
 }
-/** Defines the state data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 type State = {
   child: WorkerChild;
   queue: Promise<void>;
@@ -24,11 +24,11 @@ type State = {
   timer?: ReturnType<typeof setTimeout>;
   ended: Promise<void>;
 };
-/** Coordinates worker Supervisor responsibilities for this module. */
+/** Owns the module boundary represented by worker Supervisor and coordinates its collaborators. */
 export class WorkerSupervisor implements Supervisor {
   private children = new Map<string, State>();
   constructor(private factory: () => WorkerChild) {}
-  /** Handles start within this module's workflow. */
+  /** Initializes the module operation and connects it to its required lifecycle dependencies. */
   start(
     input: RunInput,
     apiKey: string,
@@ -39,7 +39,7 @@ export class WorkerSupervisor implements Supervisor {
     const child = this.factory();
     let ended!: () => void,
       started = false;
-    /** Configures state, the module data used by this workflow. */
+    /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
     const state: State = {
         child,
         queue: Promise.resolve(),
@@ -50,7 +50,7 @@ export class WorkerSupervisor implements Supervisor {
       },
       seen = new Set<string>();
     this.children.set(input.runId, state);
-    /** Performs post for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const post = (message: WorkerCommand) => {
       if (this.children.get(input.runId) === state) child.postMessage(message);
     };
@@ -136,14 +136,14 @@ export class WorkerSupervisor implements Supervisor {
         .finally(ended);
     });
   }
-  /** Handles cancel within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   cancel(runId: string) {
     const state = this.children.get(runId);
     if (!state) return;
     state.child.postMessage({ type: 'cancel', runId });
     state.timer ??= setTimeout(() => state.child.kill(), 2000);
   }
-  /** Handles shutdown within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   async shutdown() {
     const states = [...this.children.entries()];
     for (const [id] of states) this.cancel(id);

@@ -1,7 +1,7 @@
-/** Provides the session Sidebar module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useState } from 'react';
 import type { SessionRecord } from '../../../../../packages/shared/src/index';
-/** Performs session Sidebar for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function SessionSidebar(p: {
   sessions: SessionRecord[];
   selectedId: string | null;

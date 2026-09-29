@@ -1,6 +1,6 @@
-/** Provides the composer module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useRef, useState } from 'react';
-/** Performs composer for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function Composer({
   busy,
   stopping,
@@ -17,7 +17,7 @@ export function Composer({
   const [text, setText] = useState(''),
     composing = useRef(false),
     sending = useRef(false);
-  /** Performs send for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const send = async () => {
     if (sending.current || busy || disabled || !text.trim()) return;
     sending.current = true;

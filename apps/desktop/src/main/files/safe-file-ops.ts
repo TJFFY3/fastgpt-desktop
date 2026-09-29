@@ -1,4 +1,4 @@
-/** Provides the safe file ops module for the desktop application. */
+/** Enforces the main-process filesystem safety boundary for workspace artifacts. */
 import { execFile } from 'node:child_process';
 import { lstat, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -9,7 +9,7 @@ import {
   type FileEntry,
 } from '../../../../../packages/shared/src/index';
 import { assertNoPathCollisions, safeRelativePath } from './path-policy';
-/** Defines the file Fingerprint data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type FileFingerprint = {
   sha256: string;
   size: number;
@@ -17,8 +17,9 @@ export type FileFingerprint = {
   inode: string;
   mtimeNs: string;
 };
-/** Defines the file Limits data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type FileLimits = { maxEntries: number; maxFileBytes: number; maxTotalBytes: number };
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 const fingerprintSchema = z.strictObject({
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   size: z
@@ -39,10 +40,10 @@ const safeCodes = new Set([
   'INVALID_INPUT',
   'SAFE_FILES_FAILED',
 ]);
-/** Coordinates safe File Ops responsibilities for this module. */
+/** Owns the module boundary represented by safe File Ops and coordinates its collaborators. */
 export class SafeFileOps {
   constructor(private helperPath: string) {}
-  /** Handles root within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async root(root: string): Promise<string[]> {
     if (process.platform === 'win32')
       throw new AppError('SAFE_FILES_UNAVAILABLE', '此平台安全文件操作尚不可用');
@@ -51,7 +52,7 @@ export class SafeFileOps {
       throw new AppError('UNSAFE_PATH', '目录不能为链接或特殊文件');
     return [await realpath(root), String(stat.dev), String(stat.ino)];
   }
-  /** Handles invoke within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private invoke(args: string[], maxBuffer = 16 * 1024 * 1024): Promise<Buffer> {
     return new Promise((resolve, reject) =>
       execFile(
@@ -83,7 +84,7 @@ export class SafeFileOps {
       ),
     );
   }
-  /** Handles scan within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async scan(root: string, limits: FileLimits): Promise<FileEntry[]> {
     if (
       ![limits.maxEntries, limits.maxFileBytes, limits.maxTotalBytes].every(
@@ -118,7 +119,7 @@ export class SafeFileOps {
       throw new AppError('UNSAFE_PATH', '文件清单格式无效');
     }
   }
-  /** Handles copy Into within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async copyInto(
     root: string,
     path: string,
@@ -139,7 +140,7 @@ export class SafeFileOps {
       ),
     );
   }
-  /** Handles read within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   async read(root: string, path: string, offset: number, max: number): Promise<Uint8Array> {
     safeRelativePath(path);
     if (
@@ -157,13 +158,13 @@ export class SafeFileOps {
       ),
     );
   }
-  /** Handles expected within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private expected(value: FileFingerprint | null): string {
     if (!value) return 'absent';
     const v = fingerprintSchema.parse(value);
     return `${v.sha256}:${v.size}:${v.device}:${v.inode}:${v.mtimeNs}`;
   }
-  /** Handles replace within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async replace(
     root: string,
     path: string,
@@ -191,7 +192,7 @@ export class SafeFileOps {
       .strictObject({ backupKey: z.string().uuid().nullable(), version: fingerprintSchema })
       .parse(JSON.parse(result.toString('utf8')));
   }
-  /** Handles delete within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   async delete(
     root: string,
     path: string,

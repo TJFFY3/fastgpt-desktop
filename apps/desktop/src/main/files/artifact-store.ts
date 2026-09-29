@@ -1,4 +1,4 @@
-/** Provides the artifact store module for the desktop application. */
+/** Enforces the main-process filesystem safety boundary for workspace artifacts. */
 import { constants } from 'node:fs';
 import { mkdir, lstat, chmod, open, rename, unlink, rm, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -11,18 +11,20 @@ import {
 } from '../../../../../packages/shared/src/index';
 import type { SafeFileOps } from './safe-file-ops';
 import { assertNoPathCollisions, safeRelativePath } from './path-policy';
-/** Configures limits, the module data used by this workflow. */
+/** Captures domain configuration or protocol data whose fields are consumed together by this module. */
 const limits = { maxEntries: 10000, maxFileBytes: 100 * 1024 * 1024, maxTotalBytes: 1024 ** 3 };
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 const keySchema = z.string().uuid();
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 const ownerSchema = z.strictObject({
   key: keySchema,
   device: z.string(),
   inode: z.string(),
   state: z.enum(['temporary', 'promoted']),
 });
-/** Defines the owner data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 type Owner = z.infer<typeof ownerSchema>;
-/** Coordinates artifact Store responsibilities for this module. */
+/** Owns the module boundary represented by artifact Store and coordinates its collaborators. */
 export class ArtifactStore implements SandboxFileBridge {
   private initialized: Promise<void> | undefined;
   private entries = new Map<string, Map<string, { size: number; kind: 'file' | 'directory' }>>();
@@ -34,7 +36,7 @@ export class ArtifactStore implements SandboxFileBridge {
   ) {
     this.root = resolve(root);
   }
-  /** Handles initialize within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private initialize(): Promise<void> {
     return (this.initialized ??= (async () => {
       await mkdir(this.root, { recursive: true, mode: 0o700 });
@@ -49,7 +51,7 @@ export class ArtifactStore implements SandboxFileBridge {
         throw new AppError('UNSAFE_PATH', '快照归属目录无效');
     })());
   }
-  /** Handles owned within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async owned(key: string): Promise<Owner> {
     if (!keySchema.safeParse(key).success) throw new AppError('UNSAFE_PATH', '快照编号无效');
     await this.initialize();
@@ -81,7 +83,7 @@ export class ArtifactStore implements SandboxFileBridge {
       throw new AppError('SOURCE_CHANGED', '快照目录身份已变化');
     return owner;
   }
-  /** Handles save Owner within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   private async saveOwner(owner: Owner): Promise<void> {
     const destination = join(this.root, '.owners', `${owner.key}.json`),
       temporary = join(this.root, '.owners', `${randomUUID()}.tmp`);
@@ -98,7 +100,7 @@ export class ArtifactStore implements SandboxFileBridge {
     }
     await rename(temporary, destination);
   }
-  /** Handles locked within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async locked<T>(key: string, operation: () => Promise<T>): Promise<T> {
     const before = this.queues.get(key) ?? Promise.resolve(),
       next = before.catch(() => {}).then(operation);
@@ -109,7 +111,7 @@ export class ArtifactStore implements SandboxFileBridge {
       if (this.queues.get(key) === next) this.queues.delete(key);
     }
   }
-  /** Handles create Snapshot within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   async createSnapshot(): Promise<string> {
     await this.initialize();
     const key = randomUUID(),
@@ -125,17 +127,17 @@ export class ArtifactStore implements SandboxFileBridge {
     this.entries.set(key, new Map());
     return key;
   }
-  /** Handles local Path within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async localPath(key: string): Promise<string> {
     await this.owned(key);
     return join(this.root, key);
   }
-  /** Handles manifest within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   async manifest(key: string): Promise<FileEntry[]> {
     const entries = await this.fileMap(key);
     return [...entries.values()].map((e) => ({ ...e }));
   }
-  /** Handles file Map within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async fileMap(key: string): Promise<Map<string, FileEntry>> {
     const owner = await this.owned(key),
       cached = this.manifests.get(key);
@@ -149,7 +151,7 @@ export class ArtifactStore implements SandboxFileBridge {
     }
     return entries;
   }
-  /** Handles read within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   async *read(key: string, path: string): AsyncIterable<Uint8Array> {
     safeRelativePath(path);
     const entry = (await this.fileMap(key)).get(path);
@@ -166,7 +168,7 @@ export class ArtifactStore implements SandboxFileBridge {
       yield chunk;
     }
   }
-  /** Handles current within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async current(key: string) {
     let entries = this.entries.get(key);
     if (!entries) {
@@ -177,7 +179,7 @@ export class ArtifactStore implements SandboxFileBridge {
     }
     return entries;
   }
-  /** Handles parent Directories within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async parentDirectories(
     key: string,
     path: string,
@@ -196,7 +198,7 @@ export class ArtifactStore implements SandboxFileBridge {
       }
     }
   }
-  /** Handles directory within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async directory(key: string, path: string): Promise<void> {
     await this.locked(key, async () => {
       if ((await this.owned(key)).state !== 'temporary')
@@ -206,7 +208,7 @@ export class ArtifactStore implements SandboxFileBridge {
       await this.parentDirectories(key, `${path}/placeholder`, entries);
     });
   }
-  /** Handles write within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   async write(key: string, path: string, data: AsyncIterable<Uint8Array>): Promise<void> {
     await this.locked(key, async () => {
       if ((await this.owned(key)).state !== 'temporary')
@@ -254,7 +256,7 @@ export class ArtifactStore implements SandboxFileBridge {
       }
     });
   }
-  /** Handles discard within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async discard(key: string): Promise<void> {
     await this.locked(key, async () => {
       await this.owned(key);
@@ -264,7 +266,7 @@ export class ArtifactStore implements SandboxFileBridge {
       this.manifests.delete(key);
     });
   }
-  /** Handles promote within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async promote(key: string): Promise<void> {
     await this.locked(key, async () => {
       const owner = await this.owned(key);

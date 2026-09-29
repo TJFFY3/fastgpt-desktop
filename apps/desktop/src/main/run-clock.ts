@@ -10,7 +10,7 @@ export class RunClock {
     private now: () => number = () => performance.now(),
     private onError: (runId: string, error: unknown) => void = () => {},
   ) {}
-  /** Handles start within this module's workflow. */
+  /** Initializes the module operation and connects it to its required lifecycle dependencies. */
   start(runId: string): void {
     if (this.active.has(runId) || this.finished.has(runId))
       throw new Error('Clock already started');
@@ -26,20 +26,20 @@ export class RunClock {
     timer.unref?.();
     this.active.set(runId, { started, last: 0, timer });
   }
-  /** Handles elapsed within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   elapsed(runId: string): number {
     const state = this.active.get(runId);
     if (!state) return this.finished.get(runId) ?? 0;
     state.last = Math.max(state.last, Math.floor(this.now() - state.started), 0);
     return state.last;
   }
-  /** Handles checkpoint within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   checkpoint(runId: string): number {
     const elapsed = this.elapsed(runId);
     if (this.active.has(runId)) this.persist(runId, elapsed);
     return elapsed;
   }
-  /** Handles finish within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   finish(runId: string): number {
     const state = this.active.get(runId),
       elapsed = this.checkpoint(runId);
@@ -51,7 +51,7 @@ export class RunClock {
     }
     return elapsed;
   }
-  /** Handles dispose within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   dispose(): void {
     for (const state of this.active.values()) clearInterval(state.timer);
     this.active.clear();

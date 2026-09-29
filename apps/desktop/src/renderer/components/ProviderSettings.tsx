@@ -1,7 +1,7 @@
-/** Provides the provider Settings module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useState } from 'react';
 import type { ProviderDraft, ProviderView } from '../../../../../packages/shared/src/index';
-/** Configures initial, the module data used by this workflow. */
+/** Captures domain configuration or protocol data whose fields are consumed together by this module. */
 const initial: ProviderDraft = {
   name: '',
   baseUrl: 'https://api.openai.com/v1',
@@ -17,7 +17,7 @@ const initial: ProviderDraft = {
     reasoningField: 'none',
   },
 };
-/** Performs provider Settings for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function ProviderSettings({
   providers,
   onRefresh,
@@ -33,10 +33,10 @@ export function ProviderSettings({
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(''),
     [error, setError] = useState('');
-  /** Performs field for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const field = <K extends keyof ProviderDraft>(name: K, value: ProviderDraft[K]) =>
     setDraft((d) => ({ ...d, [name]: value }));
-  /** Performs edit for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const edit = (p?: ProviderView) => {
     setId(p?.id);
     setKey('');
@@ -47,7 +47,7 @@ export function ProviderSettings({
       setDraft(value);
     } else setDraft(initial);
   };
-  /** Performs action for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const action = async (fn: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);

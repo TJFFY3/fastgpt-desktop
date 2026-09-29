@@ -1,8 +1,8 @@
-/** Provides the use Run Timer module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useEffect, useState } from 'react';
 import type { RunRecord } from '../../../../../packages/shared/src/index';
 const activeStatuses = ['queued', 'running', 'waiting_approval', 'waiting_input', 'cancelling'];
-/** Performs use Run Timer for this module. */
+/** Provides the UI state and lifecycle integration consumed by this renderer feature. */
 export function useRunTimer(run: RunRecord): number {
   const [sample, setSample] = useState({ id: run.id, elapsed: run.elapsedMs });
   useEffect(() => {
@@ -11,7 +11,7 @@ export function useRunTimer(run: RunRecord): number {
       anchor = performance.now();
     const active = activeStatuses.includes(run.status);
     setSample({ id: run.id, elapsed: base });
-    /** Performs update for this module. */
+    /** Persists or updates state while maintaining this module’s data invariants. */
     const update = async () => {
       try {
         const next = await window.desktop.runs.timing(run.id);

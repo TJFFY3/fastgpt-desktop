@@ -1,22 +1,22 @@
-/** Provides the feature types module for the desktop application. */
+/** Defines cross-process contracts, validation, and shared domain primitives. */
 import type { CredentialState, ModelCapabilities, ProviderDraft } from './types';
 
-/** Defines the run Start Options data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type RunStartOptions = {
   attachmentIds: string[];
   expectedSessionRevision?: number;
   expectedWorkspaceRevision?: number;
 };
-/** Defines the run Start Request data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type RunStartRequest = RunStartOptions & { sessionId: string; text: string };
-/** Defines the model Snapshot data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ModelSnapshot = Pick<
   ProviderDraft,
   'name' | 'baseUrl' | 'modelId' | 'contextWindow' | 'maxOutputTokens' | 'timeoutMs'
 > & { providerId: string; revision: string; capabilities: ModelCapabilities };
-/** Defines the run Timing Snapshot data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type RunTimingSnapshot = { runId: string; elapsedMs: number; active: boolean };
-/** Defines the attachment Record data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type AttachmentRecord = {
   id: string;
   sessionId: string;
@@ -27,9 +27,9 @@ export type AttachmentRecord = {
   state: 'ready' | 'sent';
   snapshotKey: string;
 };
-/** Defines the attachment View data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type AttachmentView = Omit<AttachmentRecord, 'snapshotKey'>;
-/** Defines the workspace View data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type WorkspaceView = {
   id: string;
   sessionId: string;
@@ -38,22 +38,22 @@ export type WorkspaceView = {
   entryCount: number;
   totalBytes: number;
 };
-/** Defines the workspace Record data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type WorkspaceRecord = WorkspaceView & {
   sourceRoot: string | null;
   baselineKey: string;
   checkpointKey: string;
 };
-/** Defines the file Entry data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type FileEntry = {
   relativePath: string;
   kind: 'file' | 'directory';
   size: number;
   sha256: string | null;
 };
-/** Defines the file List Page data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type FileListPage = { entries: FileEntry[]; nextCursor: string | null };
-/** Defines the file Read data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type FileRead = {
   text: string;
   offset: number;
@@ -61,7 +61,7 @@ export type FileRead = {
   remainingBytes: number;
   truncated: boolean;
 };
-/** Defines the workspace Diff data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type WorkspaceDiff = {
   relativePath: string;
   kind: 'added' | 'modified' | 'deleted';
@@ -69,7 +69,7 @@ export type WorkspaceDiff = {
   beforeHash: string | null;
   afterHash: string | null;
 };
-/** Defines the workspace Preview data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type WorkspacePreview = {
   grantId: string;
   entries: FileEntry[];
@@ -78,9 +78,9 @@ export type WorkspacePreview = {
   totalBytes: number;
   truncated: boolean;
 };
-/** Defines the approval Decision data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ApprovalDecision = 'approved' | 'rejected';
-/** Defines the approval View data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ApprovalView = {
   id: string;
   runId: string;
@@ -92,9 +92,9 @@ export type ApprovalView = {
   destinationLabel: string;
   state: 'pending' | ApprovalDecision | 'revoked';
 };
-/** Defines the approval Request View data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ApprovalRequestView = Omit<ApprovalView, 'id' | 'runId' | 'callId' | 'state'>;
-/** Defines the approval Record data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ApprovalRecord = {
   view: ApprovalView;
   namespaceKey: string;
@@ -102,7 +102,7 @@ export type ApprovalRecord = {
   argumentsHash: string;
   createdAt: number;
 };
-/** Defines the speech Draft data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type SpeechDraft = {
   enabled: boolean;
   name: string;
@@ -111,25 +111,25 @@ export type SpeechDraft = {
   timeoutMs: number;
   allowInsecureHttp: boolean;
 };
-/** Defines the speech Config data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type SpeechConfig = SpeechDraft & { credentialRef: string | null; revision: string };
-/** Defines the speech View data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type SpeechView = SpeechDraft & { credentialState: CredentialState };
-/** Defines the audio Submission data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type AudioSubmission = {
   sessionId: string;
   operationId: string;
   mimeType: string;
   bytes: Uint8Array;
 };
-/** Defines the export Result data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ExportResult = {
   path: string;
   status: 'written' | 'deleted' | 'skipped' | 'conflict' | 'failed';
   backupId: string | null;
   errorCode: string | null;
 };
-/** Defines the backup View data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type BackupView = {
   id: string;
   workspaceId: string;
@@ -137,20 +137,20 @@ export type BackupView = {
   size: number;
   createdAt: number;
 };
-/** Defines the export Selection data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ExportSelection = { path: string; action: 'write' | 'delete' | 'skip' };
-/** Defines the export Preview data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ExportPreview = { token: string; changes: WorkspaceDiff[]; conflicts: string[] };
-/** Defines the sandbox Availability data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type SandboxAvailability = {
   available: boolean;
   reason: string | null;
   imageReady: boolean;
 };
-/** Defines the command Finish Reason data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type CommandFinishReason =
   'exited' | 'timeout' | 'cancelled' | 'output_limit' | 'oom' | 'failed';
-/** Defines the feature Agent Event data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type FeatureAgentEvent =
   | { type: 'reasoning_delta'; text: string }
   | { type: 'reasoning_truncated'; limitBytes: number }
@@ -167,7 +167,7 @@ export type FeatureAgentEvent =
       truncated: boolean;
     }
   | { type: 'workspace_checkpoint'; id: string; workspaceId: string; revision: number };
-/** Describes the sandbox File Bridge contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface SandboxFileBridge {
   manifest(key: string): Promise<FileEntry[]>;
   read(key: string, path: string): AsyncIterable<Uint8Array>;
@@ -175,14 +175,14 @@ export interface SandboxFileBridge {
   write(key: string, path: string, data: AsyncIterable<Uint8Array>): Promise<void>;
   discard(key: string): Promise<void>;
 }
-/** Describes the attachment Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface AttachmentApi {
   pick(sessionId: string): Promise<AttachmentView[]>;
   importDropped(sessionId: string, files: File[]): Promise<AttachmentView[]>;
   list(sessionId: string): Promise<AttachmentView[]>;
   removeDraft(id: string): Promise<void>;
 }
-/** Describes the workspace Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface WorkspaceApi {
   ensure(sessionId: string): Promise<WorkspaceView>;
   previewSelection(sessionId: string): Promise<WorkspacePreview>;
@@ -191,11 +191,11 @@ export interface WorkspaceApi {
   read(sessionId: string, path: string, offset: number, maxBytes: number): Promise<FileRead>;
   diff(sessionId: string): Promise<WorkspaceDiff[]>;
 }
-/** Describes the approval Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface ApprovalApi {
   decide(id: string, decision: ApprovalDecision): Promise<void>;
 }
-/** Describes the export Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface ExportApi {
   preview(sessionId: string, paths: string[]): Promise<ExportPreview>;
   apply(token: string, selections: ExportSelection[]): Promise<ExportResult[]>;
@@ -204,7 +204,7 @@ export interface ExportApi {
   restoreBackup(backupId: string): Promise<ExportResult>;
   removeBackups(ids: string[]): Promise<void>;
 }
-/** Describes the speech Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface SpeechApi {
   get(): Promise<SpeechView>;
   save(draft: SpeechDraft, apiKey?: string): Promise<SpeechView>;
@@ -212,7 +212,7 @@ export interface SpeechApi {
   submit(audio: AudioSubmission): Promise<{ operationId: string; text: string }>;
   cancel(operationId: string): Promise<void>;
 }
-/** Describes the sandbox Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface SandboxApi {
   detect(): Promise<SandboxAvailability>;
   prepareImage(): Promise<{ imageId: string }>;

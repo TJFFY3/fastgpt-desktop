@@ -1,4 +1,4 @@
-/** Provides the session repository module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
@@ -16,9 +16,9 @@ import {
 } from '../../shared/src/index';
 import type { Database } from './database';
 import { namespaceKey } from './namespace';
-/** Defines the row data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 type Row = Record<string, unknown>;
-/** Performs record for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 function record(r: Row): SessionRecord {
   return {
     id: r.id as string,
@@ -33,10 +33,10 @@ function record(r: Row): SessionRecord {
     workspaceId: r.workspace_id as string | null,
   };
 }
-/** Coordinates session Repository responsibilities for this module. */
+/** Owns the module boundary represented by session Repository and coordinates its collaborators. */
 export class SessionRepository {
   constructor(private db: Database) {}
-  /** Handles create within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   create(n: Namespace, draft: SessionDraft): SessionRecord {
     const value = sessionDraftSchema.parse(draft),
       key = namespaceKey(n);
@@ -55,7 +55,7 @@ export class SessionRepository {
       .run(key, id, value.providerId, value.title, time, time);
     return this.get(n, id);
   }
-  /** Handles get within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   get(n: Namespace, id: string): SessionRecord {
     const r = this.db.raw
       .prepare('SELECT * FROM sessions WHERE namespace_key=? AND id=?')
@@ -63,7 +63,7 @@ export class SessionRepository {
     if (!r) throw new AppError('NOT_FOUND', '会话不存在');
     return record(r);
   }
-  /** Handles list within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   list(n: Namespace, filter: SessionFilter = {}): SessionRecord[] {
     return this.db.raw
       .prepare(
@@ -77,7 +77,7 @@ export class SessionRepository {
       )
       .map(record);
   }
-  /** Handles update within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   update(n: Namespace, id: string, patch: SessionPatch): SessionRecord {
     return this.db.transaction(() => {
       const current = this.get(n, id),
@@ -114,7 +114,7 @@ export class SessionRepository {
       return this.get(n, id);
     });
   }
-  /** Handles remove within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   remove(n: Namespace, id: string) {
     this.get(n, id);
     if (
@@ -129,7 +129,7 @@ export class SessionRepository {
       .prepare('DELETE FROM sessions WHERE namespace_key=? AND id=?')
       .run(namespaceKey(n), id);
   }
-  /** Handles messages within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   messages(n: Namespace, id: string): MessageRecord[] {
     this.get(n, id);
     return this.db.raw
@@ -137,7 +137,7 @@ export class SessionRepository {
       .all(namespaceKey(n), id)
       .map((r) => messageRecordSchema.parse(JSON.parse(r.data as string)));
   }
-  /** Handles append Message within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   appendMessage(
     n: Namespace,
     id: string,
@@ -154,7 +154,7 @@ export class SessionRepository {
             'SELECT COALESCE(MAX(seq),0)+1 AS seq FROM messages WHERE namespace_key=? AND session_id=?',
           )
           .get(key, id)!;
-      /** Configures result, the module data used by this workflow. */
+      /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
       const result: MessageRecord = {
         runId: metadata.runId ?? null,
         attachmentIds: metadata.attachmentIds ?? [],

@@ -1,7 +1,7 @@
-/** Provides the use Run Events module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useEffect, useState } from 'react';
 import type { RunEvent } from '../../../../../packages/shared/src/index';
-/** Performs use Run Events for this module. */
+/** Provides the UI state and lifecycle integration consumed by this renderer feature. */
 export function useRunEvents(runId: string | null) {
   const [events, setEvents] = useState<RunEvent[]>([]),
     [error, setError] = useState('');
@@ -11,7 +11,7 @@ export function useRunEvents(runId: string | null) {
     if (!runId) return;
     let alive = true;
     const received = new Map<number, RunEvent>();
-    /** Performs merge for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const merge = (values: RunEvent[]) => {
       if (!alive) return;
       for (const e of values) if (e.runId === runId) received.set(e.seq, e);

@@ -1,4 +1,4 @@
-/** Provides the approval repository module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import {
   AppError,
   approvalRecordSchema,
@@ -11,13 +11,13 @@ import type { Database } from './database';
 import type { RunRepository } from './run-repository';
 import { activeStatuses } from './run-repository';
 import { namespaceKey } from './namespace';
-/** Coordinates approval Repository responsibilities for this module. */
+/** Owns the module boundary represented by approval Repository and coordinates its collaborators. */
 export class ApprovalRepository {
   constructor(
     private db: Database,
     private runs: RunRepository,
   ) {}
-  /** Handles get within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   get(n: Namespace, id: string): ApprovalRecord {
     const r = this.db.raw
       .prepare('SELECT data FROM approvals WHERE namespace_key=? AND id=?')
@@ -25,7 +25,7 @@ export class ApprovalRepository {
     if (!r) throw new AppError('NOT_FOUND', '授权记录不存在');
     return approvalRecordSchema.parse(JSON.parse(r.data as string));
   }
-  /** Handles insert within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   insert(n: Namespace, record: ApprovalRecord): void {
     const a = approvalRecordSchema.parse(record),
       run = this.runs.get(n, a.view.runId),
@@ -42,7 +42,7 @@ export class ApprovalRepository {
       .prepare('INSERT INTO approvals(namespace_key,id,session_id,run_id,data) VALUES(?,?,?,?,?)')
       .run(key, a.view.id, a.sessionId, a.view.runId, JSON.stringify(a));
   }
-  /** Handles decide within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   decide(n: Namespace, id: string, decision: ApprovalDecision): ApprovalRecord {
     return this.db.transaction(() => {
       approvalDecisionSchema.parse(decision);
@@ -61,7 +61,7 @@ export class ApprovalRepository {
       return a;
     });
   }
-  /** Handles revoke Run within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   revokeRun(n: Namespace, runId: string): void {
     this.runs.get(n, runId);
     for (const row of this.db.raw

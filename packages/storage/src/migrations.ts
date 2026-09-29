@@ -1,8 +1,8 @@
-/** Provides the migrations module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import type { Database } from './database';
 import { randomUUID } from 'node:crypto';
 import { AppError, modelProfileSchema, messageRecordSchema } from '../../shared/src/index';
-/** Performs migrate for this module. */
+/** Persists or updates state while maintaining this module’s data invariants. */
 export function migrate(db: Database): void {
   db.transaction(() => {
     db.raw.exec('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY)');

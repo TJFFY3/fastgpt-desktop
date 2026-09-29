@@ -1,4 +1,4 @@
-/** Provides the run repository module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
@@ -26,7 +26,7 @@ export const activeStatuses: RunStatus[] = [
   'waiting_input',
   'cancelling',
 ];
-/** Configures allowed, the module data used by this workflow. */
+/** Captures domain configuration or protocol data whose fields are consumed together by this module. */
 const allowed: Partial<Record<RunStatus, RunStatus[]>> = {
   queued: ['running', 'cancelling', 'cancelled', 'failed', 'interrupted'],
   running: [
@@ -42,7 +42,7 @@ const allowed: Partial<Record<RunStatus, RunStatus[]>> = {
   waiting_input: ['running', 'cancelling', 'failed', 'interrupted'],
   cancelling: ['cancelled', 'failed', 'interrupted'],
 };
-/** Performs record for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 function record(r: Record<string, unknown>): RunRecord {
   return runRecordSchema.parse({
     id: r.id as string,
@@ -56,14 +56,14 @@ function record(r: Record<string, unknown>): RunRecord {
     timingUpdatedAt: r.timing_updated_at ?? null,
   });
 }
-/** Coordinates run Repository responsibilities for this module. */
+/** Owns the module boundary represented by run Repository and coordinates its collaborators. */
 export class RunRepository {
   constructor(
     private db: Database,
     private sessions: SessionRepository,
     private attachments: AttachmentRepository,
   ) {}
-  /** Handles create With User Message within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   createWithUserMessage(
     n: Namespace,
     sessionId: string,
@@ -104,7 +104,7 @@ export class RunRepository {
       return this.get(n, id);
     });
   }
-  /** Handles get within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   get(n: Namespace, id: string): RunRecord {
     const row = this.db.raw
       .prepare('SELECT * FROM runs WHERE namespace_key=? AND id=?')
@@ -112,7 +112,7 @@ export class RunRepository {
     if (!row) throw new AppError('NOT_FOUND', '运行不存在');
     return record(row);
   }
-  /** Handles list within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   list(n: Namespace, sessionId: string): RunRecord[] {
     this.sessions.get(n, sessionId);
     return this.db.raw
@@ -122,7 +122,7 @@ export class RunRepository {
       .all(namespaceKey(n), sessionId)
       .map(record);
   }
-  /** Handles save Timing within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   saveTiming(n: Namespace, id: string, elapsedMs: number): RunRecord {
     const run = this.get(n, id);
     if (!Number.isFinite(elapsedMs) || elapsedMs < 0)
@@ -135,7 +135,7 @@ export class RunRepository {
       .run(elapsedMs, Date.now(), namespaceKey(n), id);
     return this.get(n, id);
   }
-  /** Handles transition within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   transition(
     n: Namespace,
     id: string,
@@ -150,7 +150,7 @@ export class RunRepository {
       .run(status, errorCode, Date.now(), namespaceKey(n), id);
     return this.get(n, id);
   }
-  /** Handles append Event within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   appendEvent(
     n: Namespace,
     id: string,
@@ -166,7 +166,7 @@ export class RunRepository {
             'SELECT COALESCE(MAX(seq),0)+1 AS seq FROM run_events WHERE namespace_key=? AND run_id=?',
           )
           .get(key, id)!;
-      /** Configures result, the module data used by this workflow. */
+      /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
       const result = {
         ...value,
         ...(metadata ? { messageId: metadata.messageId } : {}),
@@ -189,7 +189,7 @@ export class RunRepository {
       return result;
     });
   }
-  /** Handles events within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   events(n: Namespace, id: string, afterSeq = 0): RunEvent[] {
     this.get(n, id);
     return this.db.raw
@@ -199,7 +199,7 @@ export class RunRepository {
       .all(namespaceKey(n), id, afterSeq)
       .map((r) => JSON.parse(r.data as string));
   }
-  /** Handles recover Interrupted within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   recoverInterrupted(): number {
     return this.db.transaction(() => {
       const rows = this.db.raw
@@ -208,7 +208,7 @@ export class RunRepository {
         )
         .all();
       for (const row of rows) {
-        /** Configures n, the module data used by this workflow. */
+        /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
         const [instanceId, accountId, teamId] = JSON.parse(row.namespace_key as string),
           n = { instanceId, accountId, teamId },
           run = record(row);
@@ -237,7 +237,7 @@ export class RunRepository {
       return rows.length;
     });
   }
-  /** Handles reserve Tool Call within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   reserveToolCall(
     n: Namespace,
     id: string,
@@ -262,7 +262,7 @@ export class RunRepository {
       return 'reserved';
     });
   }
-  /** Handles tool Result within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   toolResult(n: Namespace, id: string, callId: string): ToolResult | null {
     this.get(n, id);
     const r = this.db.raw
@@ -270,7 +270,7 @@ export class RunRepository {
       .get(namespaceKey(n), id, callId);
     return r?.result ? JSON.parse(r.result as string) : null;
   }
-  /** Handles complete Tool Call within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   completeToolCall(n: Namespace, id: string, callId: string, result: ToolResult) {
     this.get(n, id);
     const changed = this.db.raw

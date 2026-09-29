@@ -1,4 +1,4 @@
-/** Provides the provider service module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import {
   AppError,
   providerDraftSchema,
@@ -14,14 +14,14 @@ import {
 } from '../../../../packages/model-adapter/src/index';
 import type { ProviderRepository } from '../../../../packages/storage/src/index';
 import type { SecretStore } from './credentials';
-/** Coordinates provider Service responsibilities for this module. */
+/** Owns the module boundary represented by provider Service and coordinates its collaborators. */
 export class ProviderService {
   constructor(
     private repository: ProviderRepository,
     private secrets: SecretStore,
     private adapter: ModelAdapter = new OpenAiChatAdapter(),
   ) {}
-  /** Handles view within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private view(n: Namespace, profile: ModelProfile): ProviderView {
     const { credentialRef, ...value } = profile;
     return {
@@ -29,7 +29,7 @@ export class ProviderService {
       credentialState: credentialRef ? this.secrets.status(credentialRef, n) : 'missing',
     };
   }
-  /** Handles save within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   async save(
     n: Namespace,
     draft: ProviderDraft,
@@ -54,18 +54,18 @@ export class ProviderService {
     if (secret && old?.credentialRef) await this.secrets.remove(old.credentialRef, n);
     return this.view(n, profile);
   }
-  /** Handles list within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   async list(n: Namespace) {
     return this.repository.list(n).map((p) => this.view(n, p));
   }
-  /** Handles resolve within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async resolve(n: Namespace, id: string) {
     const profile = this.repository.get(n, id),
       apiKey = profile.credentialRef ? await this.secrets.get(profile.credentialRef, n) : null;
     if (apiKey === null) throw new AppError('CREDENTIAL_REQUIRED', '请重新填写该模型的 API Key');
     return { profile, apiKey };
   }
-  /** Handles test within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async test(n: Namespace, id: string) {
     const resolved = await this.resolve(n, id);
     return this.adapter.probe({
@@ -73,7 +73,7 @@ export class ProviderService {
       signal: new AbortController().signal,
     });
   }
-  /** Handles remove within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   async remove(n: Namespace, id: string) {
     const profile = this.repository.get(n, id);
     this.repository.remove(n, id);

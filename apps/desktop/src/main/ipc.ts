@@ -1,4 +1,4 @@
-/** Provides the ipc module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import { z } from 'zod';
 import {
   AppError,
@@ -16,7 +16,7 @@ import type { AgentService } from './agent-service';
 const id = z.string().min(1).max(512),
   empty = z.strictObject({}),
   byId = z.strictObject({ id });
-/** Configures inputs, the module data used by this workflow. */
+/** Captures domain configuration or protocol data whose fields are consumed together by this module. */
 const inputs = {
   'providers:list': empty,
   'providers:save': z.strictObject({
@@ -40,18 +40,18 @@ const inputs = {
     afterSeq: z.number().int().nonnegative().default(0),
   }),
 };
-/** Describes the frame contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 interface Frame {
   url: string;
   routingId: number;
   processId: number;
 }
-/** Describes the sender contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 interface Sender {
   id: number;
   mainFrame: Frame;
 }
-/** Performs authorize Sender for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function authorizeSender(
   event: { sender: Sender; senderFrame: Frame | null },
   expected: Sender,
@@ -80,14 +80,14 @@ export function authorizeSender(
   }
   if (!allowed) throw new AppError('FORBIDDEN', '不允许的页面来源');
 }
-/** Performs parse Ipc Input for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export function parseIpcInput(channel: string, raw: unknown) {
   if (!Object.hasOwn(inputs, channel)) throw new AppError('FORBIDDEN', '不允许的操作');
   const parsed = inputs[channel as keyof typeof inputs].safeParse(raw);
   if (!parsed.success) throw new AppError('INVALID_INPUT', '请求参数无效');
   return parsed.data;
 }
-/** Performs register Ipc for this module. */
+/** Initializes the module operation and connects it to its required lifecycle dependencies. */
 export function registerIpc(
   ipc: {
     handle(channel: string, listener: (event: any, raw: unknown) => Promise<unknown>): void;

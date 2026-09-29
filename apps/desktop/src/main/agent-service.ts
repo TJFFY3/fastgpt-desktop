@@ -1,4 +1,4 @@
-/** Provides the agent service module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import {
   AppError,
   runStartSchema,
@@ -18,7 +18,7 @@ import { ToolGateway } from './tool-gateway';
 import { RunClock } from './run-clock';
 import { RunStartService, type ContextPreparer } from './run-start-service';
 export { modelHistory } from './run-start-service';
-/** Describes the supervisor contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface Supervisor {
   start(
     input: RunInput,
@@ -30,7 +30,7 @@ export interface Supervisor {
   cancel(runId: string): void;
   shutdown(): Promise<void>;
 }
-/** Coordinates agent Service responsibilities for this module. */
+/** Owns the module boundary represented by agent Service and coordinates its collaborators. */
 export class AgentService {
   private running = new Map<
     string,
@@ -75,7 +75,7 @@ export class AgentService {
       },
     );
   }
-  /** Handles start within this module's workflow. */
+  /** Initializes the module operation and connects it to its required lifecycle dependencies. */
   async start(n: Namespace, sessionId: string, text: string, options?: RunStartOptions) {
     const request = runStartSchema.parse({
       sessionId,
@@ -87,7 +87,7 @@ export class AgentService {
     const prepared = await this.starts.prepare(n, request);
     if (this.revoked.has(namespaceKey(n)) || namespaceKey(n) !== namespaceKey(this.principal()))
       throw new AppError('PERMISSION_DENIED', '当前身份已失效');
-    /** Configures state, the module data used by this workflow. */
+    /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
     const run = prepared.commit(),
       state = {
         namespace: n,
@@ -97,7 +97,7 @@ export class AgentService {
       };
     this.running.set(run.id, state);
     this.clock.start(run.id);
-    /** Performs event for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const event = async (value: AgentEvent) => {
       const persisted = this.store.transaction(() => {
         let messageId: string | undefined;
@@ -148,7 +148,7 @@ export class AgentService {
       )
         this.publish(persisted);
     };
-    /** Performs on Exit for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const onExit = async () => {
       const current = this.store.runs.get(n, run.id);
       if (activeStatuses.includes(current.status)) {
@@ -185,13 +185,13 @@ export class AgentService {
       state.error = 'WORKER_START_FAILED';
       await event({ type: 'status', status: 'failed' });
     }
-    /** Performs throw If Active for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     function throwIfActive() {
       if (state.controller.signal.aborted) throw new AppError('ABORTED', '任务已取消');
     }
     return this.store.runs.get(n, run.id);
   }
-  /** Handles cancel within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   async cancel(n: Namespace, runId: string) {
     const run = this.store.runs.get(n, runId);
     if (!activeStatuses.includes(run.status)) return;
@@ -208,7 +208,7 @@ export class AgentService {
     }
     this.supervisor.cancel(runId);
   }
-  /** Handles cancel Namespace within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   async cancelNamespace(n: Namespace) {
     this.revoked.add(namespaceKey(n));
     await Promise.all(
@@ -217,7 +217,7 @@ export class AgentService {
         .map(([id]) => this.cancel(n, id)),
     );
   }
-  /** Handles timing within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   timing(n: Namespace, runId: string): RunTimingSnapshot {
     const run = this.store.runs.get(n, runId),
       active = activeStatuses.includes(run.status);
@@ -227,7 +227,7 @@ export class AgentService {
       elapsedMs: active && this.running.has(runId) ? this.clock.elapsed(runId) : run.elapsedMs,
     };
   }
-  /** Handles dispose within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   dispose(): void {
     this.clock.dispose();
   }

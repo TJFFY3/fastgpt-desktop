@@ -1,4 +1,4 @@
-/** Provides the attachment repository module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import {
   AppError,
   attachmentRecordSchema,
@@ -8,13 +8,13 @@ import {
 import type { Database } from './database';
 import type { SessionRepository } from './session-repository';
 import { namespaceKey } from './namespace';
-/** Coordinates attachment Repository responsibilities for this module. */
+/** Owns the module boundary represented by attachment Repository and coordinates its collaborators. */
 export class AttachmentRepository {
   constructor(
     private db: Database,
     private sessions: SessionRepository,
   ) {}
-  /** Handles list within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   list(n: Namespace, sid: string): AttachmentRecord[] {
     this.sessions.get(n, sid);
     return this.db.raw
@@ -22,7 +22,7 @@ export class AttachmentRepository {
       .all(namespaceKey(n), sid)
       .map((r) => attachmentRecordSchema.parse(JSON.parse(r.data as string)));
   }
-  /** Handles get within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   get(n: Namespace, id: string): AttachmentRecord {
     const r = this.db.raw
       .prepare('SELECT data FROM attachments WHERE namespace_key=? AND id=?')
@@ -30,7 +30,7 @@ export class AttachmentRepository {
     if (!r) throw new AppError('NOT_FOUND', '附件不存在');
     return attachmentRecordSchema.parse(JSON.parse(r.data as string));
   }
-  /** Handles insert within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   insert(n: Namespace, record: AttachmentRecord): void {
     const a = attachmentRecordSchema.parse(record);
     this.sessions.get(n, a.sessionId);
@@ -38,7 +38,7 @@ export class AttachmentRepository {
       .prepare('INSERT INTO attachments(namespace_key,id,session_id,data) VALUES(?,?,?,?)')
       .run(namespaceKey(n), a.id, a.sessionId, JSON.stringify(a));
   }
-  /** Handles mark Sent within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   markSent(n: Namespace, ids: string[], messageId: string): void {
     this.db.transaction(() => {
       const key = namespaceKey(n),
@@ -63,7 +63,7 @@ export class AttachmentRepository {
       }
     });
   }
-  /** Handles remove Draft within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   removeDraft(n: Namespace, id: string): void {
     const a = this.get(n, id);
     if (a.state !== 'ready') throw new AppError('INVALID_INPUT', '已发送附件不能作为草稿移除');

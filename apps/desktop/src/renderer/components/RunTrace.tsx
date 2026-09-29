@@ -1,4 +1,4 @@
-/** Provides the run Trace module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import type {
   ApprovalDecision,
   RunEvent,
@@ -6,12 +6,12 @@ import type {
 } from '../../../../../packages/shared/src/index';
 import { useRunTimer } from '../hooks/useRunTimer';
 import { statusLabel } from './RunDetails';
-/** Performs format Duration for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function formatDuration(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;
 }
-/** Performs run Trace for this module. */
+/** Initializes the module operation and connects it to its required lifecycle dependencies. */
 export function RunTrace({
   run,
   events,

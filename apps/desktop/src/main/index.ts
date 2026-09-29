@@ -1,4 +1,4 @@
-/** Provides the index module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import { app, ipcMain, protocol, safeStorage, utilityProcess, session } from 'electron';
 import { join, isAbsolute } from 'node:path';
 import { mkdirSync } from 'node:fs';

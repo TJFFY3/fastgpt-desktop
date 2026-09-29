@@ -1,4 +1,4 @@
-/** Provides the runner module for the desktop application. */
+/** Coordinates agent execution, tool registration, and policy enforcement. */
 import {
   AppError,
   asAppError,
@@ -10,7 +10,7 @@ import {
   type ToolCall,
   type ToolExecutor,
 } from '../../shared/src/index';
-/** Coordinates agent Runner responsibilities for this module. */
+/** Owns the module boundary represented by agent Runner and coordinates its collaborators. */
 export class AgentRunner {
   constructor(
     private dependencies: {
@@ -19,7 +19,7 @@ export class AgentRunner {
       onEvent(event: AgentEvent): Promise<void>;
     },
   ) {}
-  /** Handles run within this module's workflow. */
+  /** Initializes the module operation and connects it to its required lifecycle dependencies. */
   async run(input: RunInput, apiKey: string, signal: AbortSignal): Promise<void> {
     const { model, executor, onEvent } = this.dependencies,
       messages = [...input.messages];
@@ -119,7 +119,7 @@ export class AgentRunner {
             throw new AppError('MODEL_PROTOCOL_ERROR', '工具参数不是有效 JSON 对象');
           }
         }
-        /** Configures assistant, the module data used by this workflow. */
+        /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
         const assistant: ChatMessage = {
           role: 'assistant',
           content: text || null,
@@ -147,7 +147,7 @@ export class AgentRunner {
               isError: true,
             };
           await onEvent({ type: 'tool_finished', id: call.id, result });
-          /** Configures message, the module data used by this workflow. */
+          /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
           const message: ChatMessage = {
             role: 'tool',
             toolCallId: call.id,

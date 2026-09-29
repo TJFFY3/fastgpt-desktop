@@ -1,4 +1,4 @@
-/** Provides the chat completions module for the desktop application. */
+/** Adapts provider-compatible requests and streaming responses to shared model contracts. */
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 import {
@@ -15,6 +15,7 @@ const fn = z.object({
   name: z.string().optional(),
   arguments: z.string().optional(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 const deltaSchema = z.object({
   reasoning_content: z.unknown().optional(),
   content: z.string().nullable().optional(),
@@ -28,6 +29,7 @@ const deltaSchema = z.object({
     )
     .optional(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 const chunkSchema = z.object({
   choices: z.array(
     z.object({
@@ -43,6 +45,7 @@ const chunkSchema = z.object({
     .nullable()
     .optional(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 const responseSchema = z.object({
   choices: z
     .array(
@@ -68,7 +71,7 @@ const responseSchema = z.object({
     .min(1),
   usage: chunkSchema.shape.usage,
 });
-/** Performs parse for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 function parse<T>(schema: z.ZodType<T>, text: string): T {
   try {
     return schema.parse(JSON.parse(text));
@@ -76,7 +79,7 @@ function parse<T>(schema: z.ZodType<T>, text: string): T {
     throw new AppError('MODEL_PROTOCOL_ERROR', '模型返回了无效的协议数据');
   }
 }
-/** Performs request Body for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 function requestBody(r: ModelRequest, stream: boolean) {
   return {
     model: r.profile.modelId,
@@ -105,16 +108,16 @@ function requestBody(r: ModelRequest, stream: boolean) {
       : {}),
   };
 }
-/** Coordinates open Ai Chat Adapter responsibilities for this module. */
+/** Owns the module boundary represented by open Ai Chat Adapter and coordinates its collaborators. */
 export class OpenAiChatAdapter implements ModelAdapter {
-  /** Handles stream within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async *stream(r: ModelRequest): AsyncGenerator<ModelEvent> {
     yield* this.perform(r, true);
   }
-  /** Handles perform within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   private async *perform(r: ModelRequest, stream: boolean): AsyncGenerator<ModelEvent> {
     const endpoint = normalizeChatEndpoint(r.profile.baseUrl);
-    /** Performs reasoning for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const reasoning = (value: unknown): string | undefined => {
       if (r.profile.capabilities.reasoningField !== 'reasoning_content' || value == null) return;
       if (typeof value !== 'string')
@@ -225,7 +228,7 @@ export class OpenAiChatAdapter implements ModelAdapter {
       clearTimeout(timer);
     }
   }
-  /** Handles probe within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async probe(
     r: Omit<ModelRequest, 'messages' | 'tools'>,
   ): Promise<{ reachable: boolean; tools: boolean | 'unknown' }> {

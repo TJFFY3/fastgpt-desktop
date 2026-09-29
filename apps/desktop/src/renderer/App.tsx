@@ -1,4 +1,4 @@
-/** Provides the app module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   MessageRecord,
@@ -15,7 +15,7 @@ import { Composer } from './components/Composer';
 import { ModelPicker } from './components/ModelPicker';
 import { useSessionRuns } from './hooks/useSessionRuns';
 const active = ['queued', 'running', 'waiting_approval', 'waiting_input', 'cancelling'];
-/** Performs app for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export default function App() {
   const initiallySelected = useRef(false);
   const selection = useRef({ id: null as string | null, generation: 0 });
@@ -119,7 +119,7 @@ export default function App() {
       alive = false;
     };
   }, [latestStatus, selectedId, fail, refresh]);
-  /** Performs new Session for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const newSession = async () => {
     if (!providerId) {
       setSettings(true);
@@ -140,7 +140,7 @@ export default function App() {
       fail(String(e));
     }
   };
-  /** Performs update for this module. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   const update = async (
     id: string,
     patch: { title?: string; pinned?: boolean; archived?: boolean },
@@ -154,7 +154,7 @@ export default function App() {
       fail(String(e));
     }
   };
-  /** Performs remove for this module. */
+  /** Releases managed state and prevents further use of the affected resource. */
   const remove = async (s: SessionRecord) => {
     if (
       !window.confirm(
@@ -170,7 +170,7 @@ export default function App() {
       fail(String(e));
     }
   };
-  /** Performs change Model for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const changeModel = async (id: string) => {
     if (busy) return;
     if (!selectedId) {
@@ -191,12 +191,12 @@ export default function App() {
       setModelSwitching(false);
     }
   };
-  /** Performs send for this module. */
+  /** Implements one focused part of this module’s public responsibility. */
   const send = async (text: string) => {
     if (!selectedId || busy) return false;
     const id = selectedId,
       generation = ++selection.current.generation;
-    /** Performs still Selected for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const stillSelected = () =>
       selection.current.id === id && selection.current.generation === generation;
     setPendingStarts((previous) => new Set(previous).add(id));

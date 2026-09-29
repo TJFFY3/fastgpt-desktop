@@ -1,4 +1,4 @@
-/** Provides the schemas module for the desktop application. */
+/** Defines cross-process contracts, validation, and shared domain primitives. */
 import { z } from 'zod';
 import {
   featureEventSchemas,
@@ -7,11 +7,13 @@ import {
 } from './feature-schemas';
 const id = z.string().min(1).max(512);
 const content = z.string().max(1024 * 1024);
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const namespaceSchema = z.strictObject({
   instanceId: id,
   accountId: id,
   teamId: id,
 });
+/** Validates the cross-provider settings accepted before a model profile is persisted or invoked. */
 export const providerDraftSchema = z
   .strictObject({
     name: z.string().trim().min(1).max(100),
@@ -27,20 +29,24 @@ export const providerDraftSchema = z
     message: '输出上限必须小于上下文窗口',
     path: ['maxOutputTokens'],
   });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const toolCallSchema = z.strictObject({
   id,
   name: z.string().min(1).max(128),
   arguments: content,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const toolSpecSchema = z.strictObject({
   name: z.string().min(1).max(128),
   description: z.string().max(8192),
   parameters: z.record(z.string(), z.unknown()),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const toolResultSchema = z.strictObject({
   content,
   isError: z.boolean(),
 });
+/** Enforces role-specific content and tool-call invariants for persisted and provider-bound chat messages. */
 export const chatMessageSchema = z
   .strictObject({
     role: z.enum(['system', 'user', 'assistant', 'tool']),
@@ -58,6 +64,7 @@ export const chatMessageSchema = z
     if ((m.role === 'user' || m.role === 'system') && (!m.content || !m.content.trim()))
       ctx.addIssue({ code: 'custom', message: '消息不能为空' });
   });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const runStatusSchema = z.enum([
   'queued',
   'running',
@@ -69,6 +76,7 @@ export const runStatusSchema = z.enum([
   'failed',
   'interrupted',
 ]);
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const agentEventSchema = z.discriminatedUnion('type', [
   ...featureEventSchemas,
   z.strictObject({ type: z.literal('status'), status: runStatusSchema }),
@@ -89,11 +97,13 @@ export const agentEventSchema = z.discriminatedUnion('type', [
     message: z.string().max(2048),
   }),
 ]);
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const modelProfileSchema = providerDraftSchema.extend({
   id,
   credentialRef: id.nullable(),
   revision: id.default('legacy'),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const runInputSchema = z.strictObject({
   runId: id,
   sessionId: id,
@@ -102,20 +112,24 @@ export const runInputSchema = z.strictObject({
   messages: z.array(chatMessageSchema),
   tools: z.array(toolSpecSchema).max(128),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const sendMessageSchema = z.strictObject({
   sessionId: id,
   text: z.string().trim().min(1).max(65536),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const sessionDraftSchema = z.strictObject({
   title: z.string().trim().min(1).max(256),
   providerId: id,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const sessionPatchSchema = z.strictObject({
   providerId: id.optional(),
   title: z.string().trim().min(1).max(256).optional(),
   pinned: z.boolean().optional(),
   archived: z.boolean().optional(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const messageRecordSchema = chatMessageSchema.safeExtend({
   id,
   sessionId: id,
@@ -125,6 +139,7 @@ export const messageRecordSchema = chatMessageSchema.safeExtend({
   runId: id.nullable().default(null),
   attachmentIds: z.array(id).max(16).default([]),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const runRecordSchema = z.strictObject({
   id,
   sessionId: id,
@@ -136,10 +151,12 @@ export const runRecordSchema = z.strictObject({
   elapsedMs: z.number().nonnegative().default(0),
   timingUpdatedAt: z.number().nonnegative().nullable().default(null),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const sessionFilterSchema = z.strictObject({
   query: z.string().max(256).optional(),
   archived: z.boolean().optional(),
 });
+/** Validates commands sent between the main process and the isolated agent worker. */
 export const workerCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('start'),
@@ -161,6 +178,7 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
   }),
   z.strictObject({ type: z.literal('shutdown') }),
 ]);
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const workerReplySchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('ready') }),
   z.strictObject({

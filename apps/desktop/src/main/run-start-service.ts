@@ -1,4 +1,4 @@
-/** Provides the run start service module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import {
   AppError,
   modelSnapshotSchema,
@@ -19,7 +19,7 @@ export function modelHistory(records: MessageRecord[]): ChatMessage[] {
   for (let i = 0; i < records.length; i++) {
     const r = records[i];
     if (r.status !== 'complete' || r.role === 'tool') continue;
-    /** Configures message, the module data used by this workflow. */
+    /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
     const message: ChatMessage = {
       role: r.role,
       content: r.content,
@@ -51,14 +51,14 @@ export function modelHistory(records: MessageRecord[]): ChatMessage[] {
   }
   return result;
 }
-/** Defines the context Preparer data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type ContextPreparer = (
   n: Namespace,
   request: RunStartRequest,
   profile: ModelProfile,
   tools: ToolSpec[],
 ) => Promise<ChatMessage[]>;
-/** Coordinates run Start Service responsibilities for this module. */
+/** Owns the module boundary represented by run Start Service and coordinates its collaborators. */
 export class RunStartService {
   constructor(
     private store: Store,
@@ -70,11 +70,11 @@ export class RunStartService {
       { role: 'user', content: request.text || '已添加文件' },
     ],
   ) {}
-  /** Handles prepare within this module's workflow. */
+  /** Initializes the module operation and connects it to its required lifecycle dependencies. */
   async prepare(n: Namespace, input: RunStartRequest) {
     const request = runStartSchema.parse(input),
       key = namespaceKey(n);
-    /** Performs identity for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const identity = () => {
       if (namespaceKey(this.principal()) !== key)
         throw new AppError('PERMISSION_DENIED', '当前身份已失效');
@@ -83,7 +83,7 @@ export class RunStartService {
     const session = this.store.sessions.get(n, request.sessionId),
       profile = this.store.providers.get(n, session.providerId),
       workspace = this.store.workspaces.getForSession(n, session.id);
-    /** Performs validate for this module. */
+    /** Validates or normalizes untrusted input before it crosses this module boundary. */
     const validate = () => {
       identity();
       const current = this.store.sessions.get(n, session.id),

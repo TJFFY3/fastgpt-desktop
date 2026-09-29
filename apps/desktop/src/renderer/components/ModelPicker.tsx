@@ -1,6 +1,6 @@
-/** Provides the model Picker module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import type { ProviderView } from '../../../../../packages/shared/src/index';
-/** Performs model Picker for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function ModelPicker({
   providers,
   value,

@@ -1,6 +1,6 @@
-/** Provides the database module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import { DatabaseSync } from 'node:sqlite';
-/** Coordinates database responsibilities for this module. */
+/** Owns the module boundary represented by database and coordinates its collaborators. */
 export class Database {
   readonly raw: DatabaseSync;
   private depth = 0;
@@ -11,7 +11,7 @@ export class Database {
       'PRAGMA foreign_keys = ON; PRAGMA journal_mode = WAL; PRAGMA busy_timeout = 5000;',
     );
   }
-  /** Handles transaction within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   transaction<T>(operation: () => T): T {
     if (this.depth) return operation();
     this.raw.exec('BEGIN IMMEDIATE');
@@ -27,7 +27,7 @@ export class Database {
       this.depth--;
     }
   }
-  /** Handles close within this module's workflow. */
+  /** Releases managed state and prevents further use of the affected resource. */
   close() {
     if (!this.closed) {
       this.raw.close();

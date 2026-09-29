@@ -1,6 +1,6 @@
-/** Provides the errors module for the desktop application. */
+/** Adapts provider-compatible requests and streaming responses to shared model contracts. */
 import { AppError } from '../../shared/src/index';
-/** Performs http Error for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function httpError(status: number): AppError {
   if (status === 401 || status === 403)
     return new AppError('AUTH_FAILED', '模型认证失败，请检查密钥和权限');

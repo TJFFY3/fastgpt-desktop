@@ -1,4 +1,4 @@
-/** Provides the index module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import { Database } from './database';
 import { migrate } from './migrations';
 import { CredentialRepository } from './credential-repository';
@@ -9,7 +9,7 @@ import { AttachmentRepository } from './attachment-repository';
 import { WorkspaceRepository } from './workspace-repository';
 import { ApprovalRepository } from './approval-repository';
 import { TranscriptionRepository } from './transcription-repository';
-/** Performs open Store for this module. */
+/** Initializes the module operation and connects it to its required lifecycle dependencies. */
 export function openStore(path: string) {
   const db = new Database(path);
   migrate(db);
@@ -29,7 +29,7 @@ export function openStore(path: string) {
     close: () => db.close(),
   };
 }
-/** Defines the store data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type Store = ReturnType<typeof openStore>;
 export { namespaceKey } from './namespace';
 export { CredentialRepository } from './credential-repository';

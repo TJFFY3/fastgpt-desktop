@@ -1,5 +1,5 @@
-/** Performs window Options for this module. */
-/** Provides the window module for the desktop application. */
+/** Implements one focused part of this module’s public responsibility. */
+/** Implements an Electron main-process service or integration boundary. */
 export function windowOptions(preload: string) {
   return {
     width: 1280,
@@ -17,7 +17,7 @@ export function windowOptions(preload: string) {
     },
   };
 }
-/** Performs safe External Url for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export function safeExternalUrl(value: string) {
   try {
     const u = new URL(value);
@@ -26,7 +26,7 @@ export function safeExternalUrl(value: string) {
     return false;
   }
 }
-/** Performs create Window for this module. */
+/** Persists or updates state while maintaining this module’s data invariants. */
 export async function createWindow(preload: string) {
   const { BrowserWindow, shell } = await import('electron');
   const window = new BrowserWindow(windowOptions(preload));

@@ -1,4 +1,4 @@
-/** Provides the main module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

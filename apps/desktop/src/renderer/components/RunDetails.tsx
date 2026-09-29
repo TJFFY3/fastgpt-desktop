@@ -1,6 +1,6 @@
-/** Provides the run Details module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import type { RunEvent, RunStatus } from '../../../../../packages/shared/src/index';
-/** Configures status Label, the module data used by this workflow. */
+/** Captures domain configuration or protocol data whose fields are consumed together by this module. */
 export const statusLabel: Record<RunStatus, string> = {
   queued: '等待运行',
   running: '运行中',
@@ -12,7 +12,7 @@ export const statusLabel: Record<RunStatus, string> = {
   failed: '执行失败',
   interrupted: '已中断',
 };
-/** Performs run Details for this module. */
+/** Initializes the module operation and connects it to its required lifecycle dependencies. */
 export function RunDetails({ status, events }: { status: RunStatus | null; events: RunEvent[] }) {
   const calls = events.filter((e) => e.type === 'tool_started');
   return (

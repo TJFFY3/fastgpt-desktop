@@ -1,8 +1,9 @@
-/** Provides the feature schemas module for the desktop application. */
+/** Defines cross-process contracts, validation, and shared domain primitives. */
 import { z } from 'zod';
 
+/** Identifies a feature-owned record without accepting empty or oversized identifiers. */
 export const featureIdSchema = z.string().min(1).max(512);
-/** Performs byte String for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export const byteString = (max: number) =>
   z
     .string()
@@ -15,12 +16,14 @@ const uniqueIds = z
   .array(id)
   .max(16)
   .refine((ids) => new Set(ids).size === ids.length, '文件编号不能重复');
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const modelCapabilitiesSchema = z.strictObject({
   tools: z.boolean().default(false),
   temperature: z.boolean().default(false),
   outputTokenField: z.enum(['max_tokens', 'max_completion_tokens']).default('max_tokens'),
   reasoningField: z.enum(['none', 'reasoning_content']).default('none'),
 });
+/** Captures the provider settings frozen into a run so later provider edits cannot change execution semantics. */
 export const modelSnapshotSchema = z
   .strictObject({
     providerId: id,
@@ -34,14 +37,17 @@ export const modelSnapshotSchema = z
     timeoutMs: z.number().int().min(10).max(600_000),
   })
   .refine((v) => v.maxOutputTokens < v.contextWindow, '输出上限必须小于上下文窗口');
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const runStartOptionsSchema = z.strictObject({
   attachmentIds: uniqueIds.default([]),
   expectedSessionRevision: count.optional(),
   expectedWorkspaceRevision: count.optional(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const runStartSchema = runStartOptionsSchema
   .extend({ sessionId: id, text: byteString(65536).transform((v) => v.trim()) })
   .refine((v) => !!v.text || v.attachmentIds.length > 0, '消息和附件不能同时为空');
+/** Rejects paths that could escape a workspace root or contain unsafe path components. */
 export const relativePathSchema = byteString(1024).refine(
   (v) =>
     v.length > 0 &&
@@ -56,6 +62,7 @@ export const relativePathSchema = byteString(1024).refine(
       ),
   '文件路径不安全',
 );
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const attachmentRecordSchema = z.strictObject({
   id,
   sessionId: id,
@@ -66,7 +73,9 @@ export const attachmentRecordSchema = z.strictObject({
   state: z.enum(['ready', 'sent']),
   snapshotKey: id,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const attachmentViewSchema = attachmentRecordSchema.omit({ snapshotKey: true });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const workspaceViewSchema = z.strictObject({
   id,
   sessionId: id,
@@ -75,11 +84,13 @@ export const workspaceViewSchema = z.strictObject({
   entryCount: count.max(10000),
   totalBytes: count.max(1024 ** 3),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const workspaceRecordSchema = workspaceViewSchema.extend({
   sourceRoot: byteString(8192).nullable(),
   baselineKey: id,
   checkpointKey: id,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const fileEntrySchema = z
   .strictObject({
     relativePath: relativePathSchema,
@@ -91,10 +102,12 @@ export const fileEntrySchema = z
     (v) => (v.kind === 'directory' ? v.size === 0 && v.sha256 === null : v.sha256 !== null),
     '文件类型信息不一致',
   );
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const fileListPageSchema = z.strictObject({
   entries: z.array(fileEntrySchema).max(100),
   nextCursor: id.nullable(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const fileReadSchema = z.strictObject({
   text: byteString(65536),
   offset: count,
@@ -102,6 +115,7 @@ export const fileReadSchema = z.strictObject({
   remainingBytes: count,
   truncated: z.boolean(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const workspaceDiffSchema = z.strictObject({
   relativePath: relativePathSchema,
   kind: z.enum(['added', 'modified', 'deleted']),
@@ -109,7 +123,9 @@ export const workspaceDiffSchema = z.strictObject({
   beforeHash: hash.nullable(),
   afterHash: hash.nullable(),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const approvalDecisionSchema = z.enum(['approved', 'rejected']);
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const approvalViewSchema = z.strictObject({
   id,
   runId: id,
@@ -121,12 +137,14 @@ export const approvalViewSchema = z.strictObject({
   destinationLabel: byteString(2048),
   state: z.enum(['pending', 'approved', 'rejected', 'revoked']),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const approvalRequestSchema = approvalViewSchema.omit({
   id: true,
   runId: true,
   callId: true,
   state: true,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const approvalRecordSchema = z.strictObject({
   view: approvalViewSchema,
   namespaceKey: byteString(2048),
@@ -134,6 +152,7 @@ export const approvalRecordSchema = z.strictObject({
   argumentsHash: hash,
   createdAt: count,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const speechDraftSchema = z.strictObject({
   enabled: z.boolean().default(false),
   name: z.string().trim().min(1).max(100),
@@ -142,13 +161,16 @@ export const speechDraftSchema = z.strictObject({
   timeoutMs: z.number().int().min(10000).max(600000).default(120000),
   allowInsecureHttp: z.boolean().default(false),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const speechConfigSchema = speechDraftSchema.extend({
   credentialRef: id.nullable(),
   revision: id,
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const speechViewSchema = speechDraftSchema.extend({
   credentialState: z.enum(['persistent', 'session_only', 'missing']),
 });
+/** Validates serialized or untrusted values before they enter the shared domain model. */
 export const audioSubmissionSchema = z.strictObject({
   sessionId: id,
   operationId: id,

@@ -1,7 +1,7 @@
-/** Provides the use Sessions module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { SessionRecord } from '../../../../../packages/shared/src/index';
-/** Performs use Sessions for this module. */
+/** Provides the UI state and lifecycle integration consumed by this renderer feature. */
 export function useSessions(query: string, archived: boolean, onError: (message: string) => void) {
   const [sessions, setSessions] = useState<SessionRecord[]>([]),
     revision = useRef(0);

@@ -1,10 +1,10 @@
-/** Provides the protocol module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AppError } from '../../../../packages/shared/src/index';
 export const productionCsp =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'";
-/** Performs resource Path for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 export function resourcePath(value: string, root: string) {
   const url = new URL(value);
   let pathname: string;
@@ -30,7 +30,7 @@ export function resourcePath(value: string, root: string) {
   if (!path.startsWith(base + sep)) throw new AppError('FORBIDDEN', '资源路径越界');
   return path;
 }
-/** Performs install Protocol for this module. */
+/** Initializes the module operation and connects it to its required lifecycle dependencies. */
 export async function installProtocol(root: string) {
   const { protocol, net } = await import('electron');
   protocol.handle('app', async (request) => {

@@ -1,13 +1,13 @@
-/** Provides the index module for the desktop application. */
+/** Exposes the renderer’s deliberately restricted bridge to approved desktop IPC operations. */
 import { contextBridge, ipcRenderer } from 'electron';
 import type { DesktopApi, IpcResult, RunEvent } from '../../../../packages/shared/src/index';
-/** Performs invoke for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 async function invoke<T>(channel: string, input: unknown): Promise<T> {
   const result: IpcResult<T> = await ipcRenderer.invoke(channel, input);
   if (!result.ok) throw new Error(`${result.error.code}: ${result.error.message}`);
   return result.data;
 }
-/** Configures api, the module data used by this workflow. */
+/** Captures domain configuration or protocol data whose fields are consumed together by this module. */
 const api: DesktopApi = {
   providers: {
     list: () => invoke('providers:list', {}),
@@ -35,7 +35,7 @@ const api: DesktopApi = {
     events: (runId, afterSeq = 0) => invoke('runs:events', { runId, afterSeq }),
   },
   onRunEvent: (listener) => {
-    /** Performs handler for this module. */
+    /** Implements one focused part of this module’s public responsibility. */
     const handler = (_event: unknown, event: RunEvent) => listener(event);
     ipcRenderer.on('run:event', handler);
     return () => {

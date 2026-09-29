@@ -1,4 +1,4 @@
-/** Provides the index module for the desktop application. */
+/** Runs the isolated worker-side protocol adapter used by agent execution. */
 import type {} from 'electron';
 import { randomUUID } from 'node:crypto';
 import { AgentRunner } from '../../../../packages/agent-core/src/index';
@@ -23,7 +23,7 @@ const pending = new Map<
 const controller = new AbortController();
 let runId: string | undefined,
   started = false;
-/** Performs request for this module. */
+/** Implements one focused part of this module’s public responsibility. */
 function request(message: WorkerReply & { requestId: string }): Promise<ToolResult | undefined> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {

@@ -1,4 +1,4 @@
-/** Provides the workspace repository module for the desktop application. */
+/** Implements namespaced durable storage and record conversion for desktop state. */
 import {
   AppError,
   workspaceRecordSchema,
@@ -8,13 +8,13 @@ import {
 import type { Database } from './database';
 import type { SessionRepository } from './session-repository';
 import { namespaceKey } from './namespace';
-/** Coordinates workspace Repository responsibilities for this module. */
+/** Owns the module boundary represented by workspace Repository and coordinates its collaborators. */
 export class WorkspaceRepository {
   constructor(
     private db: Database,
     private sessions: SessionRepository,
   ) {}
-  /** Handles get For Session within this module's workflow. */
+  /** Returns data through this module while preserving its ownership and consistency rules. */
   getForSession(n: Namespace, sid: string): WorkspaceRecord | null {
     this.sessions.get(n, sid);
     const r = this.db.raw
@@ -22,7 +22,7 @@ export class WorkspaceRepository {
       .get(namespaceKey(n), sid);
     return r ? workspaceRecordSchema.parse(JSON.parse(r.data as string)) : null;
   }
-  /** Handles save within this module's workflow. */
+  /** Persists or updates state while maintaining this module’s data invariants. */
   save(n: Namespace, record: WorkspaceRecord): void {
     this.db.transaction(() => {
       const w = workspaceRecordSchema.parse(record),

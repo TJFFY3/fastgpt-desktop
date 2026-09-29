@@ -1,4 +1,4 @@
-/** Provides the desktop api module for the desktop application. */
+/** Defines cross-process contracts, validation, and shared domain primitives. */
 import type {
   MessageRecord,
   ProviderDraft,
@@ -11,7 +11,7 @@ import type {
   SessionRecord,
 } from './types';
 import type { RunStartOptions, RunTimingSnapshot } from './feature-types';
-/** Describes the desktop Api contract used by this module. */
+/** Specifies the contract callers must satisfy at this module boundary. */
 export interface DesktopApi {
   providers: {
     list(): Promise<ProviderView[]>;
@@ -35,6 +35,6 @@ export interface DesktopApi {
   };
   onRunEvent(listener: (event: RunEvent) => void): () => void;
 }
-/** Defines the ipc Result data shape used by this module. */
+/** Defines the data shape exchanged through this module without exposing its implementation. */
 export type IpcResult<T = unknown> =
   { ok: true; data: T } | { ok: false; error: { code: string; message: string } };

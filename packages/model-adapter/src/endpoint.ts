@@ -1,6 +1,6 @@
-/** Provides the endpoint module for the desktop application. */
+/** Adapts provider-compatible requests and streaming responses to shared model contracts. */
 import { AppError } from '../../shared/src/index';
-/** Performs normalize Chat Endpoint for this module. */
+/** Validates or normalizes untrusted input before it crosses this module boundary. */
 export function normalizeChatEndpoint(baseUrl: string): URL {
   let url: URL;
   try {

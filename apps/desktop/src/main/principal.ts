@@ -1,6 +1,6 @@
-/** Provides the principal module for the desktop application. */
+/** Implements an Electron main-process service or integration boundary. */
 import { namespaceSchema, type Namespace } from '../../../../packages/shared/src/index';
-/** Coordinates principal Service responsibilities for this module. */
+/** Owns the module boundary represented by principal Service and coordinates its collaborators. */
 export class PrincipalService {
   private namespace: Namespace = Object.freeze({
     instanceId: 'local',
@@ -8,11 +8,11 @@ export class PrincipalService {
     teamId: 'personal',
   });
   constructor(private revoke: (namespace: Namespace) => Promise<void>) {}
-  /** Handles current within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   current() {
     return this.namespace;
   }
-  /** Handles switch To within this module's workflow. */
+  /** Implements one focused part of this module’s public responsibility. */
   async switchTo(namespace: Namespace) {
     const value = namespaceSchema.parse(namespace);
     await this.revoke(this.namespace);

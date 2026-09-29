@@ -1,27 +1,27 @@
-/** Provides the credentials module for the desktop application. */
+/** Stores provider credentials without exposing plaintext to the renderer or database. */
 import { randomUUID } from 'node:crypto';
 import type { CredentialRepository } from '../../../../packages/storage/src/index';
 import { namespaceKey } from '../../../../packages/storage/src/index';
 import type { CredentialState, Namespace } from '../../../../packages/shared/src/index';
-/** Describes the safe Storage Backend contract used by this module. */
+/** Abstracts the platform secure-storage service used to encrypt credentials at rest. */
 export interface SafeStorageBackend {
   isAvailable(): Promise<boolean>;
   isSecure(): Promise<boolean>;
   encrypt(text: string): Promise<Uint8Array>;
   decrypt(data: Uint8Array): Promise<string>;
 }
-/** Coordinates secret Store responsibilities for this module. */
+/** Saves credentials encrypted when secure storage is available, otherwise retains them only for this process session. */
 export class SecretStore {
   private memory = new Map<string, string>();
   constructor(
     private repository: CredentialRepository,
     private backend: SafeStorageBackend,
   ) {}
-  /** Handles key within this module's workflow. */
+  /** Derives an in-memory key scoped to both a credential reference and namespace. */
   private key(ref: string, n: Namespace) {
     return JSON.stringify([namespaceKey(n), ref]);
   }
-  /** Handles put within this module's workflow. */
+  /** Creates a credential reference and writes encrypted bytes or an ephemeral memory-only fallback. */
   async put(
     secret: string,
     n: Namespace,
@@ -41,7 +41,7 @@ export class SecretStore {
     this.memory.set(this.key(ref, n), secret);
     return { ref, state: 'session_only' };
   }
-  /** Handles get within this module's workflow. */
+  /** Resolves a credential only when it belongs to the namespace and can be decrypted securely. */
   async get(ref: string, n: Namespace): Promise<string | null> {
     const memory = this.memory.get(this.key(ref, n));
     if (memory !== undefined) return memory;
@@ -54,7 +54,7 @@ export class SecretStore {
       return null;
     }
   }
-  /** Handles status within this module's workflow. */
+  /** Reports whether a reference is persisted, session-only, or unavailable without revealing its secret. */
   status(ref: string, n: Namespace): CredentialState {
     return this.memory.has(this.key(ref, n))
       ? 'session_only'
@@ -62,12 +62,12 @@ export class SecretStore {
         ? 'persistent'
         : 'missing';
   }
-  /** Handles remove within this module's workflow. */
+  /** Removes both durable and process-memory representations of a credential reference. */
   async remove(ref: string, n: Namespace) {
     this.memory.delete(this.key(ref, n));
     this.repository.remove(n, ref);
   }
-  /** Handles clear Session Only within this module's workflow. */
+  /** Clears credentials that intentionally never persisted beyond the current session. */
   clearSessionOnly() {
     this.memory.clear();
   }

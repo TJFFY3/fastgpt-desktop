@@ -1,7 +1,7 @@
-/** Provides the env module for the desktop application. */
+/** Defines renderer UI behavior and presentation for the desktop chat workspace. */
 import type { DesktopApi } from '../../../../packages/shared/src/index';
 declare global {
-  /** Describes the window contract used by this module. */
+  /** Specifies the contract callers must satisfy at this module boundary. */
   interface Window {
     desktop: DesktopApi;
   }
