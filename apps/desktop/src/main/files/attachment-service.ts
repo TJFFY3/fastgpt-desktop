@@ -4,7 +4,7 @@ import { basename, dirname, join, extname } from "node:path";
 import { AppError, type AttachmentRecord, type AttachmentView, type Namespace } from "../../../../../packages/shared/src/index";
 import { activeStatuses, type Store } from "../../../../../packages/storage/src/index";
 import type { ArtifactStore } from "./artifact-store";
-import type { SafeFileOps } from "./safe-file-ops";
+import type { SafeFileOps, RootIdentity, FileFingerprint } from "./safe-file-ops";
 import type { InputGrants } from "./input-grants";
 import { safeRelativePath } from "./path-policy";
 import { WorkspaceSnapshots } from "./workspace-snapshots";
@@ -14,7 +14,10 @@ export const attachmentView=({snapshotKey:_,...view}:AttachmentRecord):Attachmen
 export async function excerpt(artifacts:ArtifactStore,key:string,path:string,size:number):Promise<{text:string|null;truncated:boolean}> {
   const chunks:Uint8Array[]=[];let length=0;
   for await(const c of artifacts.read(key,path)){const part=c.subarray(0,65536-length);chunks.push(part);length+=part.length;if(length>=65536)break;}
-  const bytes=Buffer.concat(chunks),truncated=size>bytes.length;
+  return decodeExcerpt(Buffer.concat(chunks),size);
+}
+export function decodeExcerpt(bytes:Uint8Array,size:number):{text:string|null;truncated:boolean} {
+  const truncated=size>bytes.length;
   for(let trim=0;trim<=(truncated?3:0);trim++) {try {const text=new TextDecoder("utf-8",{fatal:true}).decode(bytes.subarray(0,bytes.length-trim));if(/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(text))return {text:null,truncated};return {text,truncated};}catch{/* a cut UTF-8 tail may lose up to 3 bytes */}}
   return {text:null,truncated};
 }
@@ -28,11 +31,12 @@ export class AttachmentService {
       this.idle(n,sid,signal);const existing=this.store.attachments.list(n,sid),ready=existing.filter(a=>a.state==="ready");
       if(ready.length+paths.length>16)throw new AppError("ATTACHMENT_LIMIT","一次最多添加 16 个附件");
       let total=ready.reduce((s,a)=>s+a.size,0);
-      for(const path of paths){safeRelativePath(basename(path));const stat=await lstat(path);if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1)throw new AppError("UNSAFE_PATH","只能选择普通文件");if(stat.size>maxFile||(total+=stat.size)>maxBatch)throw new AppError("ATTACHMENT_LIMIT","附件超过 20 MiB 单文件或 100 MiB 批次限制");}
+      const bindings=new Map<string,{expectedRoot:RootIdentity;expectedFile:FileFingerprint}>();
+      for(const path of paths){safeRelativePath(basename(path));const stat=await lstat(path,{bigint:true});if(!stat.isFile()||stat.isSymbolicLink()||stat.nlink!==1n)throw new AppError("UNSAFE_PATH","只能选择普通文件");if(stat.size>maxFile)throw new AppError("ATTACHMENT_LIMIT","附件超过 20 MiB 单文件限制");const parent=await lstat(dirname(path),{bigint:true});if(!parent.isDirectory()||parent.isSymbolicLink())throw new AppError("UNSAFE_PATH","文件父目录必须为普通目录");const expectedRoot={device:String(parent.dev),inode:String(parent.ino)},expectedFile=await this.files.fingerprint(dirname(path),basename(path),expectedRoot);if(!expectedFile||expectedFile.device!==String(stat.dev)||expectedFile.inode!==String(stat.ino)||expectedFile.mtimeNs!==String(stat.mtimeNs)||expectedFile.size!==Number(stat.size))throw new AppError("SOURCE_CHANGED","所选文件已变化");if(expectedFile.size>maxFile||(total+=expectedFile.size)>maxBatch)throw new AppError("ATTACHMENT_LIMIT","附件超过 20 MiB 单文件或 100 MiB 批次限制");bindings.set(path,{expectedRoot,expectedFile});}
       this.idle(n,sid,signal);const current=await this.snapshots.ensure(n,sid,signal),keys:string[]=[],records:AttachmentRecord[]=[];let checkpoint:string|undefined,committed=false;
       try {
         for(const path of paths){this.idle(n,sid,signal);const id=randomUUID(),name=basename(path),key=await this.artifacts.createSnapshot();keys.push(key);const relative=attachmentPath({id,name});await this.artifacts.directory(key,`.attachments/${id}`);
-          const fingerprint=await this.files.copyInto(dirname(path),name,join(await this.artifacts.localPath(key),relative),maxFile);await this.artifacts.promote(key);
+          const fingerprint=await this.files.copyInto(dirname(path),name,join(await this.artifacts.localPath(key),relative),maxFile,bindings.get(path)!);await this.artifacts.promote(key);
           const binary=/^\.(pdf|png|jpe?g|gif|webp|docx?|xlsx?|pptx?|zip|gz|mp[34]|wav|webm)$/i.test(extname(name)),content=binary?null:(await excerpt(this.artifacts,key,relative,fingerprint.size)).text;
           records.push({id,sessionId:sid,name,size:fingerprint.size,sha256:fingerprint.sha256,kind:content===null?"binary":"text",state:"ready",snapshotKey:key});
         }

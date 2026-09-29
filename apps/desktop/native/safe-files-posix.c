@@ -83,7 +83,7 @@ static void digest_copy(int in,int out,int64_t limit,char hex[65]) {
   hash_final(digest,&hash);for(int i=0;i<32;i++) snprintf(hex+2*i,3,"%02x",digest[i]);hex[64]=0;
 }
 static void unchanged(int fd,struct stat old) {struct stat now=regular(fd);if(!same(now,old)) fail("SOURCE_CHANGED");}
-static void fingerprint(struct stat s,const char *hash) {printf("{\"sha256\":\"%s\",\"size\":%jd,\"device\":\"%ju\",\"inode\":\"%ju\",\"mtimeNs\":\"%" PRId64 "\"}",hash,(intmax_t)s.st_size,(uintmax_t)s.st_dev,(uintmax_t)s.st_ino,MT(s));}
+static void fingerprint(struct stat s,const char *hash) {printf("{\"sha256\":\"%s\",\"size\":%jd,\"device\":\"%ju\",\"inode\":\"%ju\",\"mtimeNs\":\"%" PRId64 "\",\"mode\":%u}",hash,(intmax_t)s.st_size,(uintmax_t)s.st_dev,(uintmax_t)s.st_ino,MT(s),(unsigned int)(s.st_mode&0777));}
 static void json_string(const char *s) {
   putchar('"');for(const unsigned char *p=(const unsigned char*)s;*p;p++) {if(*p=='"'||*p=='\\') {putchar('\\');putchar(*p);} else if(*p<32) printf("\\u%04x",*p);else putchar(*p);}putchar('"');
 }
@@ -156,7 +156,7 @@ int main(int argc,char **argv) {
     if(fstatat(dir,name,&named,AT_SYMLINK_NOFOLLOW)||!same(named,s))fail("SOURCE_CHANGED");stable_parent(root,argv[5],dir,argv[2],roots);fingerprint(s,hash);return 0;
   }
   if(!strcmp(argv[1],"copy")) {
-    if(argc!=8) fail("INVALID_INPUT");int in=input_file(dir,name);struct stat s=regular(in);if(s.st_size>number(argv[7])) fail("WORKSPACE_LIMIT");
+    if(argc!=8&&argc!=9) fail("INVALID_INPUT");int in=input_file(dir,name);struct stat s=regular(in);if(s.st_size>number(argv[7])) fail("WORKSPACE_LIMIT");if(argc==9)check_expected(in,argv[8]);
     char *target;int destination=absolute_parent(argv[6],&target),out=openat(destination,target,O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);if(out<0) fail("SAFE_FILES_FAILED");
     track(destination,out,target);
     char hash[65];digest_copy(in,out,number(argv[7]),hash);unchanged(in,s);struct stat named;
@@ -169,20 +169,20 @@ int main(int argc,char **argv) {
     unchanged(in,s);stable_parent(root,argv[5],dir,argv[2],roots);write_all(STDOUT_FILENO,buffer,(size_t)n);return 0;
   }
   int deleting=!strcmp(argv[1],"delete");if(!deleting&&strcmp(argv[1],"replace")) fail("INVALID_INPUT");
-  if(argc!=11&&argc!=12) fail("INVALID_INPUT");path_ok(argv[9]);path_ok(argv[10]);
+  if(argc<11||argc>13) fail("INVALID_INPUT");path_ok(argv[9]);path_ok(argv[10]);int owned_backup=argc>=12&&strcmp(argv[11],"-");int64_t restore_mode=argc==13?number(argv[12]):-1;if(restore_mode>0777)fail("INVALID_INPUT");
   int previous=-1;struct stat target;
   if(!strcmp(argv[7],"absent")) {if(!fstatat(dir,name,&target,AT_SYMLINK_NOFOLLOW)||errno!=ENOENT) fail("FILE_CONFLICT");if(deleting) fail("INVALID_INPUT");}
   else {previous=input_file(dir,name);check_expected(previous,argv[7]);target=regular(previous);}
   int backups=absolute_dir(argv[8]);char backuphash[65];
-  if(previous>=0) {int out=openat(backups,argv[9],O_WRONLY|O_NOFOLLOW|O_CLOEXEC|(argc==11?O_CREAT|O_EXCL:0),0600);if(out<0) fail("SAFE_FILES_FAILED");
-    if(argc==12){struct stat b=regular(out);char owner[128];snprintf(owner,sizeof(owner),"%ju:%ju",(uintmax_t)b.st_dev,(uintmax_t)b.st_ino);if(b.st_size||strcmp(owner,argv[11]))fail("SOURCE_CHANGED");}
+  if(previous>=0) {int out=openat(backups,argv[9],O_WRONLY|O_NOFOLLOW|O_CLOEXEC|(!owned_backup?O_CREAT|O_EXCL:0),0600);if(out<0) fail("SAFE_FILES_FAILED");
+    if(owned_backup){struct stat b=regular(out);char owner[128];snprintf(owner,sizeof(owner),"%ju:%ju",(uintmax_t)b.st_dev,(uintmax_t)b.st_ino);if(b.st_size||strcmp(owner,argv[11]))fail("SOURCE_CHANGED");}
     track(backups,out,argv[9]);digest_copy(previous,out,MAXFILE,backuphash);unchanged(previous,target);if(fsync(out)) fail("SAFE_FILES_FAILED");close(out);}
   int incoming=-1;struct stat replacement;char incominghash[65];
   if(!deleting) {
     char *source;int sourcedir=absolute_parent(argv[6],&source),in=input_file(sourcedir,source);struct stat input=regular(in);
     incoming=openat(dir,argv[10],O_WRONLY|O_CREAT|O_EXCL|O_NOFOLLOW|O_CLOEXEC,0600);if(incoming<0) fail("SAFE_FILES_FAILED");
     track(dir,incoming,argv[10]);
-    digest_copy(in,incoming,MAXFILE,incominghash);unchanged(in,input);if(fsync(incoming)||fstat(incoming,&replacement)) fail("SAFE_FILES_FAILED");close(incoming);close(in);close(sourcedir);free(source);
+    digest_copy(in,incoming,MAXFILE,incominghash);unchanged(in,input);mode_t mode=restore_mode>=0?(mode_t)restore_mode:previous>=0?(target.st_mode&0777):0600;if(fchmod(incoming,mode)||fsync(incoming)||fstat(incoming,&replacement)) fail("SAFE_FILES_FAILED");close(incoming);close(in);close(sourcedir);free(source);
   }
   stable_parent(root,argv[5],dir,argv[2],roots);
   if(previous>=0) {check_expected(previous,argv[7]);struct stat now;if(fstatat(dir,name,&now,AT_SYMLINK_NOFOLLOW)||!same(target,now)) fail("FILE_CONFLICT");}
