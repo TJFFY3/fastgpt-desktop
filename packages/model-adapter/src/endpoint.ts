@@ -18,8 +18,7 @@ export function normalizeChatEndpoint(baseUrl: string): URL {
       "INVALID_INPUT",
       "模型地址仅支持无凭据和查询参数的 HTTP/HTTPS 地址",
     );
-  url.pathname = url.pathname.replace(/\/+$/, "");
-  if (!url.pathname.endsWith("/chat/completions"))
-    url.pathname += "/chat/completions";
+  const path = url.pathname.replace(/\/+$/, "");
+  url.pathname = path.endsWith("/chat/completions") ? path : path + "/chat/completions";
   return url;
 }

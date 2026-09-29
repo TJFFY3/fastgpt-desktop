@@ -38,6 +38,8 @@ async function collect(
   return events;
 }
 it("normalizes API roots without inventing v1 and rejects unsupported URLs", () => {
+  expect(normalizeChatEndpoint("https://example.com").href).toBe("https://example.com/chat/completions");
+  expect(normalizeChatEndpoint("https://example.com/").href).toBe("https://example.com/chat/completions");
   expect(normalizeChatEndpoint("https://example.com/api/").href).toBe(
     "https://example.com/api/chat/completions",
   );
