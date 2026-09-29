@@ -3,15 +3,19 @@ import {
   type ToolContext,
   type ToolResult,
   type ToolSpec,
+  type ApprovalRequestView,
+  type ToolCall,
 } from "../../shared/src/index";
 export interface RegisteredTool {
   spec: ToolSpec;
   risk: "read_only" | "mutating";
+  approval?(args:Record<string,unknown>,context:ToolContext):ApprovalRequestView;
   validate(value: unknown): Record<string, unknown>;
   execute(
     args: Record<string, unknown>,
     context: ToolContext,
     signal: AbortSignal,
+    call?:ToolCall,
   ): Promise<ToolResult>;
 }
 export class ToolRegistry {

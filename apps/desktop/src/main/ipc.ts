@@ -6,7 +6,7 @@ import {
   sessionDraftSchema,
   sessionFilterSchema,
   sessionPatchSchema,
-  sendMessageSchema,
+  runStartSchema,
   type Namespace,
 } from "../../../../packages/shared/src/index";
 import {
@@ -15,6 +15,7 @@ import {
 } from "../../../../packages/storage/src/index";
 import type { ProviderService } from "./provider-service";
 import type { AgentService } from "./agent-service";
+import type { SessionLifecycle } from "./session-lifecycle";
 const id = z.string().min(1).max(512),
   empty = z.strictObject({}),
   byId = z.strictObject({ id });
@@ -33,7 +34,8 @@ const inputs = {
   "sessions:remove": byId,
   "sessions:messages": byId,
   "runs:list": z.strictObject({ sessionId: id }),
-  "runs:start": sendMessageSchema,
+  "runs:start": runStartSchema,
+  "runs:timing": z.strictObject({runId:id}),
   "runs:cancel": z.strictObject({ runId: id }),
   "runs:events": z.strictObject({
     runId: id,
@@ -99,6 +101,7 @@ export function registerIpc(
     window: () => Sender;
     devOrigin?: string;
     beforeRunStart?: () => Promise<void>;
+    lifecycle?:Pick<SessionLifecycle,"remove">;
   },
 ) {
   const { store, providers, agents } = services;
@@ -135,21 +138,8 @@ export function registerIpc(
             data = store.sessions.messages(n, value.id);
             break;
           case "sessions:remove": {
-            const active = store.runs
-              .list(n, value.id)
-              .filter((r) => activeStatuses.includes(r.status));
-            await Promise.all(active.map((r) => agents.cancel(n, r.id)));
-            const deadline = Date.now() + 3000;
-            while (
-              store.runs
-                .list(n, value.id)
-                .some((r) => activeStatuses.includes(r.status))
-            ) {
-              if (Date.now() > deadline)
-                throw new AppError("RUN_ACTIVE", "任务尚未停止，请稍后重试");
-              await new Promise((r) => setTimeout(r, 25));
-            }
-            data = store.sessions.remove(n, value.id);
+            if(!services.lifecycle)throw new AppError("SERVICE_UNAVAILABLE","会话资源管理尚未初始化");
+            data=await services.lifecycle.remove(n,value.id);
             break;
           }
           case "runs:list":
@@ -157,7 +147,10 @@ export function registerIpc(
             break;
           case "runs:start":
             await services.beforeRunStart?.();
-            data = await agents.start(n, value.sessionId, value.text);
+            data = await agents.start(n, value.sessionId, value.text,{attachmentIds:value.attachmentIds,expectedSessionRevision:value.expectedSessionRevision,expectedWorkspaceRevision:value.expectedWorkspaceRevision});
+            break;
+          case "runs:timing":
+            data=agents.timing(n,value.runId);
             break;
           case "runs:cancel":
             data = await agents.cancel(n, value.runId);

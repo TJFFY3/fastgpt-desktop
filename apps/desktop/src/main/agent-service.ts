@@ -1,14 +1,15 @@
 import {
   AppError,
-  sendMessageSchema,
+  runStartSchema,
   type AgentEvent,
-  type ChatMessage,
-  type MessageRecord,
+  type RunStartOptions,
+  type RunTimingSnapshot,
   type Namespace,
   type RunEvent,
   type RunInput,
   type ToolCall,
   type ToolResult,
+  type ToolContext,
 } from "../../../../packages/shared/src/index";
 import {
   activeStatuses,
@@ -18,6 +19,10 @@ import {
 import type { ToolRegistry } from "../../../../packages/agent-core/src/index";
 import type { ProviderService } from "./provider-service";
 import { ToolGateway } from "./tool-gateway";
+import { RunClock } from "./run-clock";
+import { RunStartService, type ContextPreparer } from "./run-start-service";
+import type { ApprovalService } from "./tools/approval-service";
+export { modelHistory } from "./run-start-service";
 export interface Supervisor {
   start(
     input: RunInput,
@@ -25,48 +30,10 @@ export interface Supervisor {
     onEvent: (event: AgentEvent) => Promise<void>,
     onTool: (call: ToolCall) => Promise<ToolResult>,
     onExit: () => Promise<void>,
+    onStopping?:()=>void,
   ): void;
   cancel(runId: string): void;
   shutdown(): Promise<void>;
-}
-export function modelHistory(records: MessageRecord[]): ChatMessage[] {
-  const result: ChatMessage[] = [];
-  for (let i = 0; i < records.length; i++) {
-    const r = records[i];
-    if (r.status !== "complete" || r.role === "tool") continue;
-    const { role, content, toolCalls, toolCallId } = r,
-      message: ChatMessage = {
-        role,
-        content,
-        ...(toolCalls ? { toolCalls } : {}),
-        ...(toolCallId ? { toolCallId } : {}),
-      };
-    if (!toolCalls) {
-      result.push(message);
-      continue;
-    }
-    const following = records.slice(i + 1, i + 1 + toolCalls.length);
-    if (
-      following.length === toolCalls.length &&
-      following.every(
-        (m, j) =>
-          m.status === "complete" &&
-          m.role === "tool" &&
-          m.toolCallId === toolCalls[j].id,
-      )
-    ) {
-      result.push(
-        message,
-        ...following.map((m) => ({
-          role: "tool" as const,
-          content: m.content,
-          toolCallId: m.toolCallId,
-        })),
-      );
-      i += following.length;
-    }
-  }
-  return result;
 }
 export class AgentService {
   private running = new Map<
@@ -76,10 +43,18 @@ export class AgentService {
       controller: AbortController;
       partial: string;
       error: string | null;
+      cancelRequested:boolean;
     }
   >();
-  private revoked = new Set<string>();
+  private epochs = new Map<string,number>();private disposed=false;private closed=false;
+  private sessionGuard?:(n:Namespace,sid:string)=>void;
+  private resourceStop?:(runId:string)=>Promise<void>;
+  configureLifecycle(guard:(n:Namespace,sid:string)=>void,stop:(runId:string)=>Promise<void>):void{if(this.sessionGuard)throw new AppError("INVALID_INPUT","运行生命周期已配置");this.sessionGuard=guard;this.resourceStop=stop;}
+  beginShutdown():void{this.closed=true;}
+  private emitters=new Map<string,(event:AgentEvent,trusted?:boolean)=>Promise<void>>();
   private gateway: ToolGateway;
+  private clock:RunClock;
+  private starts:RunStartService;
   constructor(
     private store: Store,
     private providers: ProviderService,
@@ -87,47 +62,63 @@ export class AgentService {
     private tools: ToolRegistry,
     private principal: () => Namespace,
     private publish: (event: RunEvent) => void,
+    prepareContext?:ContextPreparer,
+    approvals?:ApprovalService,
   ) {
-    this.gateway = new ToolGateway(store.runs, tools);
+    this.gateway = new ToolGateway(store.runs, tools,approvals);
+    this.starts=new RunStartService(store,providers,principal,()=>tools.definitions(),prepareContext);
+    this.clock=new RunClock((id,elapsed)=>{
+      const state=this.running.get(id);if(state) store.runs.saveTiming(state.namespace,id,elapsed);
+    },()=>performance.now(),(id)=>{
+      const state=this.running.get(id);if(state)state.cancelRequested=true;state?.controller.abort();supervisor.cancel(id);
+    });
   }
-  async start(n: Namespace, sessionId: string, text: string) {
-    sendMessageSchema.parse({ sessionId, text });
+  async start(n: Namespace, sessionId: string, text: string, options?:RunStartOptions) {
+    if(this.closed)throw new AppError("CANCELLED","应用正在退出");
+    this.sessionGuard?.(n,sessionId);const epoch=this.epochs.get(namespaceKey(n))??0;
+    const request=runStartSchema.parse({sessionId,text,...(options ?? {attachmentIds:[]})});
     if (
-      this.revoked.has(namespaceKey(n)) ||
+      this.closed ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
-    const session = this.store.sessions.get(n, sessionId),
-      resolved = await this.providers.resolve(n, session.providerId);
+    const prepared=await this.starts.prepare(n,request);
     if (
-      this.revoked.has(namespaceKey(n)) ||
+      this.closed || (this.epochs.get(namespaceKey(n))??0)!==epoch ||
       namespaceKey(n) !== namespaceKey(this.principal())
     )
       throw new AppError("PERMISSION_DENIED", "当前身份已失效");
-    const run = this.store.runs.createWithUserMessage(n, sessionId, text),
+    this.sessionGuard?.(n,sessionId);
+    const run = prepared.commit(),
       state = {
         namespace: n,
         controller: new AbortController(),
         partial: "",
         error: null as string | null,
+        cancelRequested:false,
       };
     this.running.set(run.id, state);
-    const event = async (value: AgentEvent) => {
+    this.clock.start(run.id);
+    const event = async (value: AgentEvent,trusted=false) => {
+      if(this.disposed)return;
       const persisted = this.store.transaction(() => {
+        let messageId:string|undefined;
         const current = this.store.runs.get(n, run.id);
         if (!activeStatuses.includes(current.status)) return;
         // A cancelled worker may finish a pending round; it cannot commit a new successful response.
         if (
           state.controller.signal.aborted &&
           value.type !== "status" &&
-          value.type !== "error"
+          value.type !== "error"&&!(trusted&&(value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked"))
         )
           return;
         if (value.type === "status") {
           const status =
             state.controller.signal.aborted && value.status === "completed"
-              ? "cancelled"
+              ? state.cancelRequested?"cancelled":"interrupted"
               : value.status;
+          if(activeStatuses.includes(status)) this.clock.checkpoint(run.id);
+          else this.clock.finish(run.id);
           if (status !== current.status)
             this.store.runs.transition(n, run.id, status, state.error);
           value = { ...value, status };
@@ -138,36 +129,44 @@ export class AgentService {
                 sessionId,
                 { role: "assistant", content: state.partial },
                 status === "interrupted" ? "interrupted" : "partial",
+                {runId:run.id},
               );
             state.partial = "";
-            this.running.delete(run.id);
+              this.running.delete(run.id);
+              this.emitters.delete(run.id);
           }
         } else if (value.type === "text_delta") state.partial += value.text;
         else if (value.type === "assistant_message") {
-          this.store.sessions.appendMessage(
+          const message=this.store.sessions.appendMessage(
             n,
             sessionId,
             value.message,
             "complete",
+            {runId:run.id},
           );
+          messageId=message.id;
           if (value.message.role === "assistant") state.partial = "";
         } else if (value.type === "error") state.error = value.code;
-        return this.store.runs.appendEvent(n, run.id, value);
+        return this.store.runs.appendEvent(n, run.id, value,messageId?{messageId}:undefined);
       });
       if (
         persisted &&
-        !this.revoked.has(namespaceKey(n)) &&
+        !this.closed &&
         namespaceKey(this.principal()) === namespaceKey(n)
       )
         this.publish(persisted);
     };
+    this.emitters.set(run.id,event);
     const onExit = async () => {
+      if(this.disposed)return;
+      await this.resourceStop?.(run.id);
+      if(this.disposed)return;
       const current = this.store.runs.get(n, run.id);
       if (activeStatuses.includes(current.status)) {
         state.error = "WORKER_EXITED";
         await event({
           type: "status",
-          status: state.controller.signal.aborted ? "cancelled" : "interrupted",
+          status: state.cancelRequested ? "cancelled" : "interrupted",
         });
       }
     };
@@ -177,11 +176,11 @@ export class AgentService {
           runId: run.id,
           sessionId,
           namespace: n,
-          profile: resolved.profile,
-          messages: modelHistory(this.store.sessions.messages(n, sessionId)),
-          tools: this.tools.definitions(),
+          profile: prepared.profile,
+          messages: prepared.messages,
+          tools: prepared.tools,
         },
-        resolved.apiKey,
+        prepared.apiKey,
         event,
         async (call) => {
           throwIfActive();
@@ -192,6 +191,7 @@ export class AgentService {
           );
         },
         onExit,
+        ()=>state.controller.abort(),
       );
     } catch {
       state.error = "WORKER_START_FAILED";
@@ -203,11 +203,19 @@ export class AgentService {
     }
     return this.store.runs.get(n, run.id);
   }
+  async emit(context:ToolContext,value:AgentEvent):Promise<void>{
+    const n=context.namespace,run=this.store.runs.get(n,context.runId),state=this.running.get(run.id),emitter=this.emitters.get(run.id);
+    const terminalCleanup=value.type==="command_finished"||value.type==="approval_decided"&&value.decision==="revoked";
+    if(run.sessionId!==context.sessionId||!activeStatuses.includes(run.status)||!state||!emitter||state.controller.signal.aborted&&!terminalCleanup||this.disposed||namespaceKey(this.principal())!==namespaceKey(n))throw new AppError("PERMISSION_DENIED","当前运行不允许发布工具事件");
+    await emitter(value,true);
+  }
   async cancel(n: Namespace, runId: string) {
     const run = this.store.runs.get(n, runId);
     if (!activeStatuses.includes(run.status)) return;
     const state = this.running.get(runId);
+    if(state)state.cancelRequested=true;
     state?.controller.abort();
+    this.clock.checkpoint(runId);
     if (run.status !== "cancelling") {
       this.store.runs.transition(n, runId, "cancelling");
       const e = this.store.runs.appendEvent(n, runId, {
@@ -219,11 +227,16 @@ export class AgentService {
     this.supervisor.cancel(runId);
   }
   async cancelNamespace(n: Namespace) {
-    this.revoked.add(namespaceKey(n));
+    this.epochs.set(namespaceKey(n),(this.epochs.get(namespaceKey(n))??0)+1);
     await Promise.all(
       [...this.running.entries()]
         .filter(([, s]) => namespaceKey(s.namespace) === namespaceKey(n))
         .map(([id]) => this.cancel(n, id)),
     );
   }
+  timing(n:Namespace,runId:string):RunTimingSnapshot {
+    const run=this.store.runs.get(n,runId),active=activeStatuses.includes(run.status);
+    return {runId,active,elapsedMs:active && this.running.has(runId)?this.clock.elapsed(runId):run.elapsedMs};
+  }
+  dispose():void {this.disposed=true;this.closed=true;this.clock.dispose();}
 }

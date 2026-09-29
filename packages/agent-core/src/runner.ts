@@ -9,6 +9,7 @@ import {
   type ToolCall,
   type ToolExecutor,
 } from "../../shared/src/index";
+import { assertContextBudget } from "./context-budget";
 export class AgentRunner {
   constructor(
     private dependencies: {
@@ -24,7 +25,7 @@ export class AgentRunner {
   ): Promise<void> {
     const { model, executor, onEvent } = this.dependencies,
       messages = [...input.messages];
-    let executions = 0;
+    let executions = 0, reasoningBytes=0, reasoningTruncated=false;
     try {
       throwIfAborted(signal);
       await onEvent({ type: "status", status: "running" });
@@ -34,6 +35,7 @@ export class AgentRunner {
         let text = "",
           reason: string | undefined;
         const tools = input.profile.capabilities.tools ? input.tools : [];
+        assertContextBudget(input.profile,messages,tools);
         for await (const event of model.stream({
           profile: input.profile,
           apiKey,
@@ -42,6 +44,16 @@ export class AgentRunner {
           signal,
         })) {
           throwIfAborted(signal);
+          if(event.type==="reasoning_delta" && input.profile.capabilities.reasoningField==="reasoning_content") {
+            const bytes=Buffer.from(event.text),remaining=1024*1024-reasoningBytes;
+            if(!reasoningTruncated) {
+              let end=Math.min(remaining,bytes.length);
+              // Do not decode a partial UTF-8 codepoint at the byte budget boundary.
+              if(end<bytes.length) while(end>0 && (bytes[end]&0xc0)===0x80) end--;
+              if(end) {reasoningBytes+=end;await onEvent({type:"reasoning_delta",text:bytes.subarray(0,end).toString("utf8")});}
+              if(bytes.length>remaining) {reasoningTruncated=true;await onEvent({type:"reasoning_truncated",limitBytes:1024*1024});}
+            }
+          }
           if (event.type === "text_delta") {
             text += event.text;
             if (Buffer.byteLength(text) > 1024 * 1024)

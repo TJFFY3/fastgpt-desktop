@@ -113,3 +113,21 @@ it("retains streamed partial text and a recovery event after an application rest
   store.runs.recoverInterrupted();
   expect(store.sessions.messages(namespaceA, sessionId)).toHaveLength(2);
 });
+it("restart retains the last confirmed elapsed checkpoint and terminal timing cannot be overwritten",()=>{
+  const run=store.runs.createWithUserMessage(namespaceA,sessionId,"hi");
+  store.runs.saveTiming(namespaceA,run.id,5000);store.runs.saveTiming(namespaceA,run.id,4000);
+  expect(store.runs.get(namespaceA,run.id).elapsedMs).toBe(5000);
+  store.close();store=openStore(path);store.runs.recoverInterrupted();
+  expect(store.runs.get(namespaceA,run.id)).toMatchObject({status:"interrupted",elapsedMs:5000});
+  store.runs.saveTiming(namespaceA,run.id,9000);
+  expect(store.runs.get(namespaceA,run.id).elapsedMs).toBe(5000);
+  expect(()=>store.runs.saveTiming(namespaceB,run.id,9999)).toThrow(/NOT_FOUND/);
+});
+it("event paging does not truncate recovered partial replies past the first page",()=>{
+  const run=store.runs.createWithUserMessage(namespaceA,sessionId,"hi");
+  for(let i=0;i<501;i++) store.runs.appendEvent(namespaceA,run.id,{type:"text_delta",text:"中"});
+  expect(store.runs.events(namespaceA,run.id)).toHaveLength(500);
+  expect(store.runs.events(namespaceA,run.id,500)).toHaveLength(1);
+  store.runs.recoverInterrupted();
+  expect(store.sessions.messages(namespaceA,sessionId).at(-1)?.content).toBe("中".repeat(501));
+});

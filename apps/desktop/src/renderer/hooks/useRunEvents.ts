@@ -15,10 +15,13 @@ export function useRunEvents(runId: string | null) {
       setEvents([...received.values()].sort((a, b) => a.seq - b.seq));
     };
     const unsubscribe = window.desktop.onRunEvent((e) => merge([e]));
-    void window.desktop.runs
-      .events(runId)
-      .then(merge)
-      .catch((e) => {
+    void (async()=>{
+      let after=0;
+      while(alive) {
+        const page=await window.desktop.runs.events(runId,after);merge(page);
+        if(page.length<500) break;after=page.at(-1)!.seq;
+      }
+    })().catch((e) => {
         if (alive) setError(String(e));
       });
     return () => {

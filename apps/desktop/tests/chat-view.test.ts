@@ -12,6 +12,8 @@ const message = (
   content: string,
   status: MessageRecord["status"] = "complete",
 ): MessageRecord => ({
+  runId: null,
+  attachmentIds: [],
   id: `message-${role}`,
   sessionId: "session-1",
   seq: role === "user" ? 1 : 2,

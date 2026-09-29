@@ -71,6 +71,18 @@ it("streams text and persists a complete assistant message", async () => {
   });
   expect(r.events.at(-1)).toEqual({ type: "status", status: "completed" });
 });
+it("bounds public reasoning across tool rounds without leaking it into subsequent model history",async()=>{
+  const r=await run([
+    [{type:"reasoning_delta",text:"中".repeat(349525)},...tool],
+    [{type:"reasoning_delta",text:"中文"},{type:"reasoning_delta",text:"more"},{type:"text_delta",text:"完成"},{type:"finish",reason:"stop"}],
+  ],{profile:{...fakeModelProfile,capabilities:{...fakeModelProfile.capabilities,reasoningField:"reasoning_content"}}});
+  const reasoning=r.events.filter(e=>e.type==="reasoning_delta").map(e=>e.text).join("");
+  expect(Buffer.byteLength(reasoning)).toBe(1048575);
+  expect(reasoning).not.toContain("�");
+  expect(r.events.filter(e=>e.type==="reasoning_truncated")).toEqual([{type:"reasoning_truncated",limitBytes:1048576}]);
+  expect(r.requests[1].messages).not.toContainEqual(expect.objectContaining({content:expect.stringContaining("中")}));
+  expect(r.events).toContainEqual({type:"assistant_message",message:{role:"assistant",content:"完成"}});
+});
 it("assembles tool calls and supplies paired tool history on the next round", async () => {
   const r = await run([
     tool,

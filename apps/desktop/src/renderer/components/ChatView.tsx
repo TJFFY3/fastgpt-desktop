@@ -1,22 +1,41 @@
-import { useEffect, useRef } from "react";
+import { Fragment, useEffect, useRef } from "react";
 import type {
   MessageRecord,
   RunEvent,
+  RunRecord,
+  AttachmentView,
+  ApprovalDecision,
 } from "../../../../../packages/shared/src/index";
+import { RunTrace } from "./RunTrace";
+import { AttachmentList } from "./AttachmentList";
 export function ChatView({
   messages,
   events,
   hasSession,
   hasModels,
   onSettings,
+  runs=[],eventsByRun=new Map(),onLoadRun,
+  attachments=[],
+  onDecide,
 }: {
   messages: MessageRecord[];
   events: RunEvent[];
   hasSession: boolean;
   hasModels: boolean;
   onSettings(): void;
+  runs?:RunRecord[];eventsByRun?:Map<string,RunEvent[]>;onLoadRun?(id:string):void;
+  attachments?:AttachmentView[];
+  onDecide?(id:string,decision:ApprovalDecision):Promise<void>;
 }) {
   const bottom = useRef<HTMLDivElement>(null);
+  const known=new Set(messages.map(m=>m.id));
+  const displayed=[...messages];
+  for(const e of events) {
+    if(e.type==="assistant_message" && e.messageId && !known.has(e.messageId)) {
+      known.add(e.messageId);
+      displayed.push({...e.message,id:e.messageId,sessionId:e.sessionId,runId:e.runId,attachmentIds:[],seq:e.seq,status:"complete",createdAt:e.createdAt});
+    }
+  }
   let partial = "";
   for (const e of events) {
     if (e.type === "text_delta") partial += e.text;
@@ -32,10 +51,13 @@ export function ChatView({
     partial = "";
   useEffect(() => {
     bottom.current?.scrollIntoView({ behavior: "smooth", block: "end" });
-  }, [messages, partial]);
+  }, [messages, partial, events.length, runs.length]);
+  const lastIndex=new Map<string,number>();displayed.forEach((m,i)=>{if(m.runId) lastIndex.set(m.runId,i);});
+  const liveRunId=events[0]?.runId;
+  const trace=(r:RunRecord)=><RunTrace key={r.id} run={r} events={eventsByRun.get(r.id) ?? (liveRunId===r.id?events:[])} latest={r.id===runs.at(-1)?.id} onOpen={()=>onLoadRun?.(r.id)} onDecide={onDecide}/>;
   return (
     <div className="chat-scroll">
-      {!messages.length && !partial ? (
+      {!displayed.length && !partial ? (
         <div className="welcome">
           <div className="welcome-icon">✦</div>
           <div className="eyebrow">YOUR PERSONAL AGENT</div>
@@ -73,8 +95,8 @@ export function ChatView({
         </div>
       ) : (
         <div className="messages">
-          {messages.map((m) =>
-            m.role === "tool" ? (
+          {displayed.map((m,index) => <Fragment key={m.id}>
+            {m.role === "tool" ? (
               <details key={m.id} className="stored-tool">
                 <summary>工具结果 · {m.toolCallId}</summary>
                 <pre>{m.content}</pre>
@@ -90,6 +112,7 @@ export function ChatView({
                     </div>
                   )}
                   {m.content && <p>{m.content}</p>}
+                  <AttachmentList files={attachments.filter(a=>m.attachmentIds.includes(a.id))}/>
                   {m.toolCalls?.map((c) => (
                     <div className="tool-request" key={c.id}>
                       调用工具 <code>{c.name}</code>
@@ -97,8 +120,9 @@ export function ChatView({
                   ))}
                 </div>
               </article>
-            ),
-          )}
+            )}
+            {m.runId && lastIndex.get(m.runId)===index && !(partial && liveRunId===m.runId) && runs.filter(r=>r.id===m.runId).map(trace)}
+          </Fragment>)}
           {partial && (
             <article className="message assistant streaming">
               <div className="message-body">
@@ -107,6 +131,7 @@ export function ChatView({
               </div>
             </article>
           )}
+          {runs.filter(r=>!lastIndex.has(r.id) || (partial && r.id===liveRunId)).map(trace)}
           <div ref={bottom} />
         </div>
       )}

@@ -9,7 +9,14 @@ import type {
   SessionPatch,
   SessionRecord,
 } from "./types";
+import type { RunStartOptions, RunTimingSnapshot, AttachmentApi, WorkspaceApi, ApprovalApi, SandboxApi, ExportApi,SpeechApi } from "./feature-types";
 export interface DesktopApi {
+  speech:SpeechApi;
+  exports:ExportApi;
+  attachments:AttachmentApi;
+  workspaces:WorkspaceApi;
+  approvals:ApprovalApi;
+  sandbox:SandboxApi;
   providers: {
     list(): Promise<ProviderView[]>;
     save(
@@ -30,8 +37,9 @@ export interface DesktopApi {
     messages(id: string): Promise<MessageRecord[]>;
   };
   runs: {
+    timing(runId:string):Promise<RunTimingSnapshot>;
     list(sessionId: string): Promise<RunRecord[]>;
-    start(sessionId: string, text: string): Promise<RunRecord>;
+    start(sessionId: string, text: string, options?: RunStartOptions): Promise<RunRecord>;
     cancel(runId: string): Promise<void>;
     events(runId: string, afterSeq?: number): Promise<RunEvent[]>;
   };

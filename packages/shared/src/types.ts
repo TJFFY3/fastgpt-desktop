@@ -1,3 +1,4 @@
+import type { FeatureAgentEvent, ModelSnapshot } from "./feature-types";
 export type Namespace = {
   instanceId: string;
   accountId: string;
@@ -7,6 +8,7 @@ export type ModelCapabilities = {
   tools: boolean;
   temperature: boolean;
   outputTokenField: "max_tokens" | "max_completion_tokens";
+  reasoningField: "none" | "reasoning_content";
 };
 export type ProviderDraft = {
   name: string;
@@ -21,6 +23,7 @@ export type ProviderDraft = {
 export type ModelProfile = ProviderDraft & {
   id: string;
   credentialRef: string | null;
+  revision: string;
 };
 export type CredentialState = "persistent" | "session_only" | "missing";
 export type ProviderView = Omit<ModelProfile, "credentialRef"> & {
@@ -41,12 +44,15 @@ export type ChatMessage = {
 };
 export type SessionDraft = { title: string; providerId: string };
 export type SessionPatch = {
+  providerId?: string;
   title?: string;
   pinned?: boolean;
   archived?: boolean;
 };
 export type SessionFilter = { query?: string; archived?: boolean };
 export type SessionRecord = SessionDraft & {
+  revision: number;
+  workspaceId: string | null;
   id: string;
   namespaceKey: string;
   pinned: boolean;
@@ -55,6 +61,8 @@ export type SessionRecord = SessionDraft & {
   updatedAt: number;
 };
 export type MessageRecord = ChatMessage & {
+  runId: string | null;
+  attachmentIds: string[];
   id: string;
   sessionId: string;
   seq: number;
@@ -72,6 +80,9 @@ export type RunStatus =
   | "failed"
   | "interrupted";
 export type RunRecord = {
+  modelSnapshot: ModelSnapshot | null;
+  elapsedMs: number;
+  timingUpdatedAt: number | null;
   id: string;
   sessionId: string;
   status: RunStatus;
@@ -80,6 +91,7 @@ export type RunRecord = {
   updatedAt: number;
 };
 export type ModelEvent =
+  | { type: "reasoning_delta"; text: string }
   | { type: "text_delta"; text: string }
   | {
       type: "tool_call_delta";
@@ -91,6 +103,7 @@ export type ModelEvent =
   | { type: "usage"; inputTokens?: number; outputTokens?: number }
   | { type: "finish"; reason: string };
 export type AgentEvent =
+  | FeatureAgentEvent
   | { type: "status"; status: RunStatus }
   | { type: "text_delta"; text: string }
   | { type: "assistant_message"; message: ChatMessage }
@@ -98,6 +111,7 @@ export type AgentEvent =
   | { type: "tool_finished"; id: string; result: ToolResult }
   | { type: "error"; code: string; message: string };
 export type RunEvent = AgentEvent & {
+  messageId?: string;
   runId: string;
   sessionId: string;
   seq: number;

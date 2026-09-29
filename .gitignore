@@ -5,6 +5,8 @@ release/
 test-results/
 playwright-report/
 .superpowers/
+native-build/
 .DS_Store
 *.log
 *.sqlite*
+__pycache__/

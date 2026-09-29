@@ -15,6 +15,7 @@ const fn = z.object({
   arguments: z.string().optional(),
 });
 const deltaSchema = z.object({
+  reasoning_content: z.unknown().optional(),
   content: z.string().nullable().optional(),
   tool_calls: z
     .array(
@@ -46,6 +47,7 @@ const responseSchema = z.object({
     .array(
       z.object({
         message: z.object({
+          reasoning_content: z.unknown().optional(),
           content: z.string().nullable().optional(),
           tool_calls: z
             .array(
@@ -109,6 +111,11 @@ export class OpenAiChatAdapter implements ModelAdapter {
     stream: boolean,
   ): AsyncGenerator<ModelEvent> {
     const endpoint = normalizeChatEndpoint(r.profile.baseUrl);
+    const reasoning=(value:unknown):string|undefined=>{
+      if(r.profile.capabilities.reasoningField!=="reasoning_content" || value==null) return;
+      if(typeof value!=="string") throw new AppError("MODEL_PROTOCOL_ERROR","模型返回了无效的思考字段");
+      return value;
+    };
     if (endpoint.protocol === "http:" && !r.profile.allowInsecureHttp)
       throw new AppError("INVALID_INPUT", "使用明文 HTTP 需要明确开启许可");
     const timeout = new AbortController(),
@@ -150,6 +157,8 @@ export class OpenAiChatAdapter implements ModelAdapter {
       ) {
         const value = parse(responseSchema, await response.text()),
           choice = value.choices[0];
+        const thought=reasoning(choice.message.reasoning_content);
+        if(thought) yield {type:"reasoning_delta",text:thought};
         if (choice.message.content)
           yield { type: "text_delta", text: choice.message.content };
         for (const [index, call] of (choice.message.tool_calls ?? []).entries())
@@ -183,11 +192,13 @@ export class OpenAiChatAdapter implements ModelAdapter {
             "不支持模型同时返回多条候选回复",
           );
         for (const choice of value.choices) {
+          const thought=reasoning(choice.delta.reasoning_content);
           if (
             finished &&
-            (choice.delta.content || choice.delta.tool_calls?.length)
+            (choice.delta.content || choice.delta.tool_calls?.length || thought)
           )
             throw new AppError("MODEL_PROTOCOL_ERROR", "模型结束后仍返回增量");
+          if(thought) yield {type:"reasoning_delta",text:thought};
           if (choice.delta.content)
             yield { type: "text_delta", text: choice.delta.content };
           for (const call of choice.delta.tool_calls ?? [])

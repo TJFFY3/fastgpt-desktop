@@ -2,6 +2,11 @@ import { randomUUID } from "node:crypto";
 import {
   AppError,
   agentEventSchema,
+  approvalRecordSchema,
+  runRecordSchema,
+  modelSnapshotSchema,
+  runStartSchema,
+  type ModelSnapshot,
   type AgentEvent,
   type Namespace,
   type RunEvent,
@@ -13,6 +18,7 @@ import {
 import type { Database } from "./database";
 import { namespaceKey } from "./namespace";
 import type { SessionRepository } from "./session-repository";
+import type { AttachmentRepository } from "./attachment-repository";
 export const activeStatuses: RunStatus[] = [
   "queued",
   "running",
@@ -36,24 +42,28 @@ const allowed: Partial<Record<RunStatus, RunStatus[]>> = {
   cancelling: ["cancelled", "failed", "interrupted"],
 };
 function record(r: Record<string, unknown>): RunRecord {
-  return {
+  return runRecordSchema.parse({
     id: r.id as string,
     sessionId: r.session_id as string,
     status: r.status as RunStatus,
     errorCode: r.error_code as string | null,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
-  };
+    modelSnapshot:r.model_snapshot ? JSON.parse(r.model_snapshot as string) : null,
+    elapsedMs:r.elapsed_ms ?? 0,timingUpdatedAt:r.timing_updated_at ?? null,
+  });
 }
 export class RunRepository {
   constructor(
     private db: Database,
     private sessions: SessionRepository,
+    private attachments: AttachmentRepository,
   ) {}
   createWithUserMessage(
     n: Namespace,
     sessionId: string,
     text: string,
+    options: {snapshot?:ModelSnapshot;attachmentIds?:string[]} = {},
   ): RunRecord {
     return this.db.transaction(() => {
       this.sessions.get(n, sessionId);
@@ -61,17 +71,14 @@ export class RunRepository {
         this.list(n, sessionId).some((r) => activeStatuses.includes(r.status))
       )
         throw new AppError("RUN_ACTIVE", "会话已有正在执行的任务");
-      this.sessions.appendMessage(
-        n,
-        sessionId,
-        { role: "user", content: text },
-        "complete",
-      );
+      const request=runStartSchema.parse({sessionId,text,attachmentIds:options.attachmentIds ?? []});
       const id = randomUUID(),
         time = Date.now();
       this.db.raw
-        .prepare("INSERT INTO runs VALUES(?,?,?,'queued',NULL,?,?)")
-        .run(namespaceKey(n), sessionId, id, time, time);
+        .prepare("INSERT INTO runs(namespace_key,session_id,id,status,error_code,created_at,updated_at,model_snapshot) VALUES(?,?,?,'queued',NULL,?,?,?)")
+        .run(namespaceKey(n), sessionId, id, time, time, options.snapshot ? JSON.stringify(modelSnapshotSchema.parse(options.snapshot)):null);
+      const message=this.sessions.appendMessage(n,sessionId,{role:"user",content:request.text || "已添加文件"},"complete",{runId:id,attachmentIds:request.attachmentIds});
+      this.attachments.markSent(n,request.attachmentIds,message.id);
       return this.get(n, id);
     });
   }
@@ -91,6 +98,14 @@ export class RunRepository {
       .all(namespaceKey(n), sessionId)
       .map(record);
   }
+  saveTiming(n:Namespace,id:string,elapsedMs:number):RunRecord {
+    const run=this.get(n,id);
+    if(!Number.isFinite(elapsedMs) || elapsedMs<0) throw new AppError("INVALID_INPUT","耗时无效");
+    if(!activeStatuses.includes(run.status)) return run;
+    this.db.raw.prepare("UPDATE runs SET elapsed_ms=MAX(elapsed_ms,?),timing_updated_at=? WHERE namespace_key=? AND id=?")
+      .run(elapsedMs,Date.now(),namespaceKey(n),id);
+    return this.get(n,id);
+  }
   transition(
     n: Namespace,
     id: string,
@@ -107,7 +122,7 @@ export class RunRepository {
       .run(status, errorCode, Date.now(), namespaceKey(n), id);
     return this.get(n, id);
   }
-  appendEvent(n: Namespace, id: string, event: AgentEvent): RunEvent {
+  appendEvent(n: Namespace, id: string, event: AgentEvent, metadata?: {messageId:string}): RunEvent {
     return this.db.transaction(() => {
       const run = this.get(n, id),
         value = agentEventSchema.parse(event),
@@ -119,13 +134,16 @@ export class RunRepository {
           .get(key, id)!;
       const result = {
         ...value,
+        ...(metadata ? {messageId:metadata.messageId}:{}),
         runId: id,
         sessionId: run.sessionId,
         seq: row.seq as number,
         createdAt: Date.now(),
       };
+      if(metadata && (event.type!=="assistant_message" || !this.db.raw.prepare("SELECT 1 FROM messages WHERE namespace_key=? AND session_id=? AND id=?").get(key,run.sessionId,metadata.messageId)))
+        throw new AppError("INVALID_INPUT","消息事件归属不匹配");
       this.db.raw
-        .prepare("INSERT INTO run_events VALUES(?,?,?,?)")
+        .prepare("INSERT INTO run_events(namespace_key,run_id,seq,data) VALUES(?,?,?,?)")
         .run(key, id, result.seq, JSON.stringify(result));
       return result;
     });
@@ -134,7 +152,7 @@ export class RunRepository {
     this.get(n, id);
     return this.db.raw
       .prepare(
-        "SELECT data FROM run_events WHERE namespace_key=? AND run_id=? AND seq>? ORDER BY seq",
+        "SELECT data FROM run_events WHERE namespace_key=? AND run_id=? AND seq>? ORDER BY seq LIMIT 500",
       )
       .all(namespaceKey(n), id, afterSeq)
       .map((r) => JSON.parse(r.data as string));
@@ -153,10 +171,14 @@ export class RunRepository {
           n = { instanceId, accountId, teamId },
           run = record(row);
         let partial = "";
-        for (const e of this.events(n, run.id)) {
-          if (e.type === "text_delta") partial += e.text;
-          if (e.type === "assistant_message" && e.message.role === "assistant")
-            partial = "";
+        let after=0;
+        while(true) {
+          const page=this.events(n,run.id,after);
+          for (const e of page) {
+            if (e.type === "text_delta") partial += e.text;
+            if (e.type === "assistant_message" && e.message.role === "assistant") partial = "";
+          }
+          if(page.length<500) break;after=page.at(-1)!.seq;
         }
         if (partial)
           this.sessions.appendMessage(
@@ -164,7 +186,9 @@ export class RunRepository {
             run.sessionId,
             { role: "assistant", content: partial },
             "interrupted",
+            {runId:run.id},
           );
+        for(const saved of this.db.raw.prepare("SELECT data FROM approvals WHERE namespace_key=? AND run_id=?").all(row.namespace_key as string,run.id)){const a=approvalRecordSchema.parse(JSON.parse(saved.data as string));if(a.view.state==="pending"||a.view.state==="approved"){a.view.state="revoked";this.db.raw.prepare("UPDATE approvals SET data=? WHERE namespace_key=? AND id=?").run(JSON.stringify(a),row.namespace_key as string,a.view.id);this.appendEvent(n,run.id,{type:"approval_decided",approvalId:a.view.id,decision:"revoked"});}}
         this.transition(n, run.id, "interrupted", "WORKER_INTERRUPTED");
         this.appendEvent(n, run.id, { type: "status", status: "interrupted" });
       }
@@ -193,7 +217,7 @@ export class RunRepository {
         return row.result === null ? "unresolved" : "completed";
       }
       this.db.raw
-        .prepare("INSERT INTO tool_calls VALUES(?,?,?,?,?,NULL)")
+        .prepare("INSERT INTO tool_calls(namespace_key,run_id,call_id,name,arguments,result) VALUES(?,?,?,?,?,NULL)")
         .run(key, id, call.id, call.name, call.arguments);
       return "reserved";
     });

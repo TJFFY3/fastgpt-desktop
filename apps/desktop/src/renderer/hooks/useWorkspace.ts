@@ -1,0 +1,8 @@
+import { useCallback,useEffect,useRef,useState } from "react";
+import type { FileEntry,WorkspaceDiff,WorkspaceView } from "../../../../../packages/shared/src/index";
+export function useWorkspace(sessionId:string|null,enabled:boolean){const generation=useRef(0),[view,setView]=useState<WorkspaceView|null>(null),[files,setFiles]=useState<FileEntry[]>([]),[changes,setChanges]=useState<WorkspaceDiff[]>([]),[cursor,setCursor]=useState<string|null>(null),[error,setError]=useState("");
+  const refresh=useCallback(async()=>{const g=++generation.current;if(!sessionId){setView(null);setFiles([]);setChanges([]);return;}try{const [page,sessions]=await Promise.all([window.desktop.workspaces.list(sessionId),window.desktop.sessions.list()]);let w:WorkspaceView|null=null,diff:WorkspaceDiff[]=[];if(sessions.find(s=>s.id===sessionId)?.workspaceId){w=await window.desktop.workspaces.ensure(sessionId);diff=await window.desktop.workspaces.diff(sessionId);}if(g===generation.current){setView(w);setFiles(page.entries);setCursor(page.nextCursor);setChanges(diff);setError("");}}catch(e){if(g===generation.current)setError(String(e));}},[sessionId]);
+  useEffect(()=>{generation.current++;setView(null);setFiles([]);setChanges([]);setError("");if(enabled)void refresh();return()=>{generation.current++;};},[refresh,enabled]);
+  const more=async()=>{if(!sessionId||!cursor)return;const g=generation.current;try{const p=await window.desktop.workspaces.list(sessionId,cursor);if(g===generation.current){setFiles(f=>[...f,...p.entries]);setCursor(p.nextCursor);}}catch(e){if(g===generation.current)setError(String(e));}};
+  return {view,files,changes,cursor,error,refresh,more};
+}

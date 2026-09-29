@@ -100,6 +100,7 @@ export async function startFixtureModelServer() {
       body.tools?.length
     ) {
       writeStream(res, [
+        ...(last.content?.includes("轨迹")?[chatChunk({reasoning_content:"服务公开内容",content:"工具前解释"})]:[]),
         chatChunk({
           tool_calls: [
             {
@@ -119,7 +120,13 @@ export async function startFixtureModelServer() {
       ]);
       return;
     }
+    if(last?.role==="tool" && body.messages?.some(m=>m.role==="user" && m.content?.includes("轨迹"))) {
+      res.writeHead(200,{"Content-Type":"text/event-stream"});
+      const timer=setTimeout(()=>writeStream(res,[chatChunk({reasoning_content:"工具完成后的公开内容",content:"工具执行成功，这是测试回复。"}),chatChunk({},"stop")]),1800);
+      res.on("close",()=>clearTimeout(timer));return;
+    }
     writeStream(res, [
+      chatChunk({reasoning_content:"服务公开内容"}),
       chatChunk({
         content: last?.role === "tool" ? "工具执行成功，" : "你好，",
       }),

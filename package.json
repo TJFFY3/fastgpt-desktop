@@ -5,11 +5,14 @@
   "workspaces": ["apps/*", "packages/*"],
   "engines": { "node": ">=22.12.0" },
   "scripts": {
+    "build:safe-files": "node scripts/build-safe-files.mjs",
     "dev": "npm run dev -w @fastgpt/desktop",
     "build": "npm run build -w @fastgpt/desktop",
     "build:test": "npm run build -w @fastgpt/desktop -- --mode test",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
+    "test:sandbox": "vitest run --config vitest.sandbox.config.ts",
+    "prepare:sandbox": "node scripts/prepare-sandbox.mjs",
     "test:e2e": "npm run build:test && playwright test",
     "package:dir": "npm run build && npm run package:dir -w @fastgpt/desktop"
   },

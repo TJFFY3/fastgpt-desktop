@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   AppError,
   providerDraftSchema,
+  modelProfileSchema,
   type ModelProfile,
   type Namespace,
   type ProviderDraft,
@@ -21,10 +22,11 @@ export class ProviderRepository {
       ...providerDraftSchema.parse(draft),
       id: id ?? randomUUID(),
       credentialRef,
+      revision: randomUUID(),
     };
     this.db.raw
       .prepare(
-        "INSERT INTO providers VALUES(?,?,?) ON CONFLICT(namespace_key,id) DO UPDATE SET data=excluded.data",
+        "INSERT INTO providers(namespace_key,id,data) VALUES(?,?,?) ON CONFLICT(namespace_key,id) DO UPDATE SET data=excluded.data",
       )
       .run(namespaceKey(n), profile.id, JSON.stringify(profile));
     return profile;
@@ -34,7 +36,7 @@ export class ProviderRepository {
       .prepare("SELECT data FROM providers WHERE namespace_key=? AND id=?")
       .get(namespaceKey(n), id);
     if (!row) throw new AppError("NOT_FOUND", "模型配置不存在");
-    return JSON.parse(row.data as string);
+    return modelProfileSchema.parse(JSON.parse(row.data as string));
   }
   list(n: Namespace): ModelProfile[] {
     return this.db.raw
@@ -42,7 +44,7 @@ export class ProviderRepository {
         "SELECT data FROM providers WHERE namespace_key=? ORDER BY rowid",
       )
       .all(namespaceKey(n))
-      .map((r) => JSON.parse(r.data as string));
+      .map((r) => modelProfileSchema.parse(JSON.parse(r.data as string)));
   }
   remove(n: Namespace, id: string) {
     this.get(n, id);

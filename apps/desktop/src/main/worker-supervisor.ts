@@ -1,4 +1,5 @@
 import {
+  AppError,
   asAppError,
   workerReplySchema,
   type AgentEvent,
@@ -20,6 +21,9 @@ type State = {
   terminal: boolean;
   timer?: ReturnType<typeof setTimeout>;
   ended: Promise<void>;
+  toolsAbort:AbortController;
+  stopping:()=>void;
+  exited:boolean;
 };
 export class WorkerSupervisor implements Supervisor {
   private children = new Map<string, State>();
@@ -30,6 +34,7 @@ export class WorkerSupervisor implements Supervisor {
     onEvent: (event: AgentEvent) => Promise<void>,
     onTool: (call: ToolCall) => Promise<ToolResult>,
     onExit: () => Promise<void>,
+    onStopping?:()=>void,
   ) {
     const child = this.factory();
     let ended!: () => void,
@@ -38,6 +43,9 @@ export class WorkerSupervisor implements Supervisor {
         child,
         queue: Promise.resolve(),
         terminal: false,
+        exited:false,
+        toolsAbort:new AbortController(),
+        stopping:()=>{if(!state.toolsAbort.signal.aborted){state.toolsAbort.abort();onStopping?.();}},
         ended: new Promise((resolve) => {
           ended = resolve;
         }),
@@ -45,7 +53,7 @@ export class WorkerSupervisor implements Supervisor {
       seen = new Set<string>();
     this.children.set(input.runId, state);
     const post = (message: WorkerCommand) => {
-      if (this.children.get(input.runId) === state) child.postMessage(message);
+      if (!state.exited&&this.children.get(input.runId) === state) child.postMessage(message);
     };
     child.on("message", (raw) => {
       const parsed = workerReplySchema.safeParse(raw);
@@ -105,7 +113,9 @@ export class WorkerSupervisor implements Supervisor {
           } else {
             let result: ToolResult;
             try {
-              result = await onTool(message.call);
+              if(state.toolsAbort.signal.aborted)throw new AppError("CANCELLED","工具等待已取消");
+              let abort:()=>void=()=>{};
+              try {result=await Promise.race([onTool(message.call),new Promise<never>((_,reject)=>{abort=()=>reject(new AppError("CANCELLED","工具等待已取消"));state.toolsAbort.signal.addEventListener("abort",abort,{once:true});if(state.toolsAbort.signal.aborted)abort();})]);}finally{state.toolsAbort.signal.removeEventListener("abort",abort);}
             } catch (error) {
               const safe = asAppError(error);
               result = {
@@ -126,20 +136,23 @@ export class WorkerSupervisor implements Supervisor {
         });
     });
     child.on("exit", () => {
+      if(state.exited)return;state.exited=true;
+      state.stopping();
       clearTimeout(state.timer);
-      this.children.delete(input.runId);
       void state.queue
         .then(onExit)
         .catch(() => {})
-        .finally(ended);
+        .finally(()=>{this.children.delete(input.runId);ended();});
     });
   }
   cancel(runId: string) {
     const state = this.children.get(runId);
     if (!state) return;
-    state.child.postMessage({ type: "cancel", runId });
+    state.stopping();
+    try{state.child.postMessage({ type: "cancel", runId });}catch{state.child.kill();}
     state.timer ??= setTimeout(() => state.child.kill(), 2000);
   }
+  async waitFor(ids:string[]):Promise<void>{await Promise.all(ids.flatMap(id=>{const s=this.children.get(id);return s?[s.ended]:[];}));}
   async shutdown() {
     const states = [...this.children.entries()];
     for (const [id] of states) this.cancel(id);

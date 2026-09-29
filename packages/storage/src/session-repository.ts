@@ -2,6 +2,7 @@ import { randomUUID } from "node:crypto";
 import {
   AppError,
   chatMessageSchema,
+  messageRecordSchema,
   sessionDraftSchema,
   sessionPatchSchema,
   type ChatMessage,
@@ -25,6 +26,8 @@ function record(r: Row): SessionRecord {
     archived: !!r.archived,
     createdAt: r.created_at as number,
     updatedAt: r.updated_at as number,
+    revision: r.revision as number,
+    workspaceId: r.workspace_id as string | null,
   };
 }
 export class SessionRepository {
@@ -41,7 +44,7 @@ export class SessionRepository {
     const id = randomUUID(),
       time = Date.now();
     this.db.raw
-      .prepare("INSERT INTO sessions VALUES(?,?,?,?,0,0,?,?)")
+      .prepare("INSERT INTO sessions(namespace_key,id,provider_id,title,pinned,archived,created_at,updated_at) VALUES(?,?,?,?,0,0,?,?)")
       .run(key, id, value.providerId, value.title, time, time);
     return this.get(n, id);
   }
@@ -65,22 +68,33 @@ export class SessionRepository {
       )
       .map(record);
   }
+  /** Main-process lifecycle inventory, never exposed through the desktop bridge. */
+  all():SessionRecord[]{return this.db.raw.prepare("SELECT * FROM sessions").all().map(record);}
   update(n: Namespace, id: string, patch: SessionPatch): SessionRecord {
+    return this.db.transaction(()=>{
     const current = this.get(n, id),
       p = sessionPatchSchema.parse(patch);
+    if(p.providerId!==undefined) {
+      if(this.db.raw.prepare("SELECT 1 FROM runs WHERE namespace_key=? AND session_id=? AND status IN ('queued','running','waiting_approval','waiting_input','cancelling')").get(namespaceKey(n),id))
+        throw new AppError("RUN_ACTIVE","运行期间不能切换模型");
+      if(!this.db.raw.prepare("SELECT 1 FROM providers WHERE namespace_key=? AND id=?").get(namespaceKey(n),p.providerId))
+        throw new AppError("NOT_FOUND","模型配置不存在");
+    }
     this.db.raw
       .prepare(
-        "UPDATE sessions SET title=?,pinned=?,archived=?,updated_at=? WHERE namespace_key=? AND id=?",
+        "UPDATE sessions SET title=?,pinned=?,archived=?,provider_id=?,revision=revision+1,updated_at=? WHERE namespace_key=? AND id=?",
       )
       .run(
         p.title ?? current.title,
         Number(p.pinned ?? current.pinned),
         Number(p.archived ?? current.archived),
+        p.providerId ?? current.providerId,
         Date.now(),
         namespaceKey(n),
         id,
       );
     return this.get(n, id);
+    });
   }
   remove(n: Namespace, id: string) {
     this.get(n, id);
@@ -103,13 +117,14 @@ export class SessionRepository {
         "SELECT data FROM messages WHERE namespace_key=? AND session_id=? ORDER BY seq",
       )
       .all(namespaceKey(n), id)
-      .map((r) => JSON.parse(r.data as string));
+      .map((r) => messageRecordSchema.parse(JSON.parse(r.data as string)));
   }
   appendMessage(
     n: Namespace,
     id: string,
     message: ChatMessage,
     status: MessageRecord["status"],
+    metadata: {runId?: string;attachmentIds?: string[]} = {},
   ): MessageRecord {
     return this.db.transaction(() => {
       this.get(n, id);
@@ -121,6 +136,8 @@ export class SessionRepository {
           )
           .get(key, id)!;
       const result: MessageRecord = {
+        runId: metadata.runId ?? null,
+        attachmentIds: metadata.attachmentIds ?? [],
         ...value,
         id: randomUUID(),
         sessionId: id,
@@ -128,8 +145,11 @@ export class SessionRepository {
         status,
         createdAt: Date.now(),
       };
+      messageRecordSchema.parse(result);
+      if(result.runId && !this.db.raw.prepare("SELECT 1 FROM runs WHERE namespace_key=? AND session_id=? AND id=?").get(key,id,result.runId))
+        throw new AppError("NOT_FOUND","运行不属于此会话");
       this.db.raw
-        .prepare("INSERT INTO messages VALUES(?,?,?,?,?)")
+        .prepare("INSERT INTO messages(namespace_key,session_id,id,seq,data) VALUES(?,?,?,?,?)")
         .run(key, id, result.id, result.seq, JSON.stringify(result));
       this.db.raw
         .prepare(

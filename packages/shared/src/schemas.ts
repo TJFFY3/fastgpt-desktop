@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { featureEventSchemas, modelCapabilitiesSchema, modelSnapshotSchema } from "./feature-schemas";
 const id = z.string().min(1).max(512);
 const content = z.string().max(1024 * 1024);
 export const namespaceSchema = z.strictObject({
@@ -15,13 +16,7 @@ export const providerDraftSchema = z
     maxOutputTokens: z.number().int().positive().max(1_000_000).default(4096),
     timeoutMs: z.number().int().min(10).max(600000).default(120000),
     allowInsecureHttp: z.boolean().default(false),
-    capabilities: z.strictObject({
-      tools: z.boolean().default(false),
-      temperature: z.boolean().default(false),
-      outputTokenField: z
-        .enum(["max_tokens", "max_completion_tokens"])
-        .default("max_tokens"),
-    }),
+    capabilities: modelCapabilitiesSchema,
   })
   .refine((p) => p.maxOutputTokens < p.contextWindow, {
     message: "输出上限必须小于上下文窗口",
@@ -73,6 +68,7 @@ export const runStatusSchema = z.enum([
   "interrupted",
 ]);
 export const agentEventSchema = z.discriminatedUnion("type", [
+  ...featureEventSchemas,
   z.strictObject({ type: z.literal("status"), status: runStatusSchema }),
   z.strictObject({ type: z.literal("text_delta"), text: content }),
   z.strictObject({
@@ -94,6 +90,7 @@ export const agentEventSchema = z.discriminatedUnion("type", [
 export const modelProfileSchema = providerDraftSchema.extend({
   id,
   credentialRef: id.nullable(),
+  revision: id.default("legacy"),
 });
 export const runInputSchema = z.strictObject({
   runId: id,
@@ -112,9 +109,18 @@ export const sessionDraftSchema = z.strictObject({
   providerId: id,
 });
 export const sessionPatchSchema = z.strictObject({
+  providerId: id.optional(),
   title: z.string().trim().min(1).max(256).optional(),
   pinned: z.boolean().optional(),
   archived: z.boolean().optional(),
+});
+export const messageRecordSchema = chatMessageSchema.safeExtend({
+  id,sessionId:id,seq:z.number().int().positive(),status:z.enum(["complete","partial","interrupted"]),
+  createdAt:z.number().nonnegative(),runId:id.nullable().default(null),attachmentIds:z.array(id).max(16).default([]),
+});
+export const runRecordSchema = z.strictObject({
+  id,sessionId:id,status:runStatusSchema,errorCode:id.nullable(),createdAt:z.number().nonnegative(),updatedAt:z.number().nonnegative(),
+  modelSnapshot:modelSnapshotSchema.nullable().default(null),elapsedMs:z.number().nonnegative().default(0),timingUpdatedAt:z.number().nonnegative().nullable().default(null),
 });
 export const sessionFilterSchema = z.strictObject({
   query: z.string().max(256).optional(),
@@ -149,7 +155,7 @@ export const workerReplySchema = z.discriminatedUnion("type", [
     type: z.literal("event"),
     runId: id,
     requestId: id,
-    event: agentEventSchema,
+    event: agentEventSchema.refine(event=>!["approval_requested","approval_decided","command_started","command_output","command_finished","workspace_checkpoint"].includes(event.type),"此事件仅允许主进程发布"),
   }),
   z.strictObject({
     type: z.literal("tool_request"),
