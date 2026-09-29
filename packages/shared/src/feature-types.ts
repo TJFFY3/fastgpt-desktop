@@ -24,8 +24,7 @@ export type AudioSubmission = { sessionId: string; operationId: string; mimeType
 export type ExportResult = { path: string; status: "written" | "deleted" | "skipped" | "conflict" | "failed"; backupId: string | null; errorCode: string | null };
 export type BackupView = { id: string; workspaceId: string; name: string; size: number; createdAt: number };
 export type ExportSelection = { path: string; action: "write" | "delete" | "skip" };
-export type ExportTextPreview = {relativePath:string;binary:boolean;before:{text:string|null;truncated:boolean}|null;after:{text:string|null;truncated:boolean}|null;omitted?:boolean};
-export type ExportPreview = { token: string; changes: WorkspaceDiff[]; conflicts: string[];textPreviews:ExportTextPreview[] };
+export type ExportPreview = { token: string; changes: WorkspaceDiff[]; conflicts: string[] };
 export type SandboxAvailability = { available: boolean; reason: string | null; imageReady: boolean };
 export type CommandFinishReason = "exited" | "timeout" | "cancelled" | "output_limit" | "oom" | "failed";
 export type FeatureAgentEvent =
@@ -74,6 +73,5 @@ export interface SpeechApi {
   beginCapture(sessionId: string): Promise<{ operationId: string }>;
   submit(audio: AudioSubmission): Promise<{ operationId: string; text: string }>;
   cancel(operationId: string): Promise<void>;
-  cancelCapture(sessionId:string):Promise<void>;
 }
 export interface SandboxApi { detect(): Promise<SandboxAvailability>; prepareImage(): Promise<{ imageId: string }>; timing(runId:string,callId:string):Promise<{elapsedMs:number;active:boolean}>;onImageProgress(listener:(text:string)=>void):()=>void }

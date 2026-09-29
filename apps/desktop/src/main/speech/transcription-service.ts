@@ -22,7 +22,6 @@ export class TranscriptionService{
   private end(op:Operation):void{op.controller.abort();clearTimeout(op.timer);this.operations.delete(op.id);}
   captureScope(n:Namespace,id:string):{sessionId:string;owner:number}{const op=this.operations.get(id);if(!op||op.submitted)throw new AppError("PERMISSION_DENIED","录音授权已失效");this.check(n,op);return {sessionId:op.sessionId,owner:op.owner};}
   cancel(n:Namespace,id:string):void{const op=this.operations.get(id);if(op&&namespaceKey(op.n)===namespaceKey(n))this.end(op);}
-  cancelCapture(n:Namespace,sid:string,owner:number):void{this.principal(n);this.o.assertSession?.(n,sid);this.o.store.sessions.get(n,sid);if(owner!==this.o.window())throw new AppError("PERMISSION_DENIED","录音窗口已变化");for(const op of this.operations.values())if(namespaceKey(op.n)===namespaceKey(n)&&op.sessionId===sid&&op.owner===owner)this.end(op);}
   cancelSession(n:Namespace,sid:string):void{for(const op of this.operations.values())if(namespaceKey(op.n)===namespaceKey(n)&&op.sessionId===sid)this.end(op);}
   cancelNamespace(n:Namespace):void{for(const op of this.operations.values())if(namespaceKey(op.n)===namespaceKey(n))this.end(op);}
   shutdown():void{this.closed=true;for(const op of this.operations.values())this.end(op);}

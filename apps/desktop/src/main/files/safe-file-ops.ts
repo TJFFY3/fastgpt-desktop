@@ -4,11 +4,11 @@ import { randomUUID } from "node:crypto";
 import { z } from "zod";
 import { AppError, fileEntrySchema, type FileEntry } from "../../../../../packages/shared/src/index";
 import { assertNoPathCollisions, safeRelativePath } from "./path-policy";
-export type FileFingerprint={sha256:string;size:number;device:string;inode:string;mtimeNs:string;mode?:number};
+export type FileFingerprint={sha256:string;size:number;device:string;inode:string;mtimeNs:string};
 export type FileLimits={maxEntries:number;maxFileBytes:number;maxTotalBytes:number};
 export type RootIdentity={device:string;inode:string};
-export type MutationOptions={expectedRoot?:RootIdentity;backupKey?:string;backupOwner?:RootIdentity;restoreMode?:number};
-const fingerprintSchema=z.strictObject({sha256:z.string().regex(/^[a-f0-9]{64}$/),size:z.number().int().nonnegative().max(100*1024*1024),device:z.string().regex(/^\d+$/),inode:z.string().regex(/^\d+$/),mtimeNs:z.string().regex(/^-?\d+$/),mode:z.number().int().min(0).max(0o777).optional()});
+export type MutationOptions={expectedRoot?:RootIdentity;backupKey?:string;backupOwner?:RootIdentity};
+const fingerprintSchema=z.strictObject({sha256:z.string().regex(/^[a-f0-9]{64}$/),size:z.number().int().nonnegative().max(100*1024*1024),device:z.string().regex(/^\d+$/),inode:z.string().regex(/^\d+$/),mtimeNs:z.string().regex(/^-?\d+$/)});
 const safeCodes=new Set(["UNSAFE_PATH","SOURCE_CHANGED","FILE_CONFLICT","WORKSPACE_LIMIT","INVALID_RANGE","INVALID_INPUT","SAFE_FILES_FAILED"]);
 export class SafeFileOps {
   constructor(private helperPath:string) {}
@@ -36,9 +36,9 @@ export class SafeFileOps {
       assertNoPathCollisions(entries.map(e=>e.relativePath));return entries.sort((a,b)=>a.relativePath<b.relativePath?-1:a.relativePath>b.relativePath?1:0);
     } catch(error) {if(error instanceof AppError) throw error;throw new AppError("UNSAFE_PATH","文件清单格式无效");}
   }
-  async copyInto(root:string,path:string,destination:string,limit:number,binding?:{expectedRoot:RootIdentity;expectedFile:FileFingerprint}):Promise<FileFingerprint> {
+  async copyInto(root:string,path:string,destination:string,limit:number):Promise<FileFingerprint> {
     safeRelativePath(path);if(!Number.isSafeInteger(limit)||limit<0||limit>100*1024*1024) throw new AppError("INVALID_INPUT","文件限额无效");
-    return fingerprintSchema.parse(JSON.parse((await this.invoke(["copy",...await this.root(root,binding?.expectedRoot),path,destination,String(limit),...(binding?[this.expected(binding.expectedFile)]:[])],4096)).toString("utf8")));
+    return fingerprintSchema.parse(JSON.parse((await this.invoke(["copy",...await this.root(root),path,destination,String(limit)],4096)).toString("utf8")));
   }
   async scanWorkspace(root:string):Promise<{entries:FileEntry[];excluded:string[];fingerprints:Map<string,FileFingerprint>}> {
     const buffer=await this.invoke(["workspace-scan",...await this.root(root),"10000",String(100*1024*1024),String(1024**3)]);
@@ -58,7 +58,7 @@ export class SafeFileOps {
   }
   async fingerprint(root:string,path:string,expectedRoot?:RootIdentity):Promise<FileFingerprint|null>{safeRelativePath(path);return fingerprintSchema.nullable().parse(JSON.parse((await this.invoke(["fingerprint",...await this.root(root,expectedRoot),path],4096)).toString("utf8")));}
   async prepareParents(root:string,path:string,identity:RootIdentity):Promise<void>{safeRelativePath(path);await this.invoke(["parents",...await this.root(root,identity),path],4096);}
-  private backupOptions(options?:MutationOptions):string[]{let owner="-";if(options?.backupOwner){if(!options.backupKey)throw new AppError("INVALID_INPUT","备份身份缺失");for(const v of [options.backupOwner.device,options.backupOwner.inode])if(!/^\d+$/.test(v))throw new AppError("INVALID_INPUT","备份身份无效");owner=`${options.backupOwner.device}:${options.backupOwner.inode}`;}if(options?.restoreMode!==undefined)return [owner,String(z.number().int().min(0).max(0o777).parse(options.restoreMode))];return owner==="-"?[]:[owner];}
+  private backupOptions(options?:MutationOptions):string[]{if(!options?.backupOwner)return [];if(!options.backupKey)throw new AppError("INVALID_INPUT","备份身份缺失");for(const v of [options.backupOwner.device,options.backupOwner.inode])if(!/^\d+$/.test(v))throw new AppError("INVALID_INPUT","备份身份无效");return [`${options.backupOwner.device}:${options.backupOwner.inode}`];}
   async replace(root:string,path:string,source:string,expected:FileFingerprint|null,backups:string,options?:MutationOptions):Promise<{backupKey:string|null;version:FileFingerprint}> {
     safeRelativePath(path);const backupKey=z.string().uuid().parse(options?.backupKey??randomUUID()),tempName=`.fastgpt-${randomUUID()}`;
     const result=await this.invoke(["replace",...await this.root(root,options?.expectedRoot),path,source,this.expected(expected),backups,backupKey,tempName,...this.backupOptions(options)],4096);

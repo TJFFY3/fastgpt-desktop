@@ -1,4 +1,4 @@
-import { writeFile, truncate, symlink,rename,mkdir } from "node:fs/promises";
+import { writeFile, truncate, symlink } from "node:fs/promises";
 import { join } from "node:path";
 import { afterEach, expect, test } from "vitest";
 import { namespaceA as n, namespaceB } from "../../../tests/fixtures/data";
@@ -35,10 +35,4 @@ posix("enforces 16 files, 20 MiB per file and 100 MiB including existing drafts"
   for(let i=0;i<6;i++) await truncate(paths[i],i<5?20*1024*1024:1);
   await expect(x.service.importPicked(n,x.session.id,x.grant(paths.slice(0,6)),new AbortController().signal)).rejects.toMatchObject({code:"ATTACHMENT_LIMIT"});
   expect(x.service.list(n,x.session.id)).toEqual([]);
-});
-posix.each(["parent","file"])("preflight %s replacement cannot import unselected bytes or change the checkpoint",async kind=>{
- const x=await setup(),path=join(x.source,"note.txt");await writeFile(path,"SELECTED_BYTES");await x.service.snapshots.ensure(n,x.session.id);const prior=x.store.workspaces.getForSession(n,x.session.id)!;
- const create=x.artifacts.createSnapshot.bind(x.artifacts);let replaced=false;x.artifacts.createSnapshot=async()=>{const key=await create();if(!replaced){replaced=true;if(kind==="parent"){await rename(x.source,join(x.root,"old-source"));await mkdir(x.source);}else await rename(path,join(x.source,"old-note"));await writeFile(path,"UNSELECTED_REPLACEMENT_BYTES");}return key;};
- await expect(x.service.importPicked(n,x.session.id,x.grant([path]),new AbortController().signal)).rejects.toMatchObject({code:expect.stringMatching(/SOURCE_CHANGED|FILE_CONFLICT/)});
- expect(x.service.list(n,x.session.id)).toEqual([]);expect(x.store.workspaces.getForSession(n,x.session.id)).toEqual(prior);
 });

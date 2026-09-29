@@ -26,7 +26,7 @@ test("renderer has only the narrow bridge, CSP blocks network and keys stay off 
     expect(await page.evaluate(()=>Object.keys(window.desktop.approvals))).toEqual(["decide"]);
     expect(await page.evaluate(()=>Object.keys(window.desktop.sandbox))).toEqual(["detect","prepareImage","timing","onImageProgress"]);
     expect(await page.evaluate(()=>Object.keys(window.desktop.exports))).toEqual(["preview","apply","exportToChosenDirectory","listBackups","restoreBackup","removeBackups"]);
-    expect(await page.evaluate(()=>Object.keys(window.desktop.speech))).toEqual(["get","save","beginCapture","submit","cancel","cancelCapture"]);
+    expect(await page.evaluate(()=>Object.keys(window.desktop.speech))).toEqual(["get","save","beginCapture","submit","cancel"]);
     const sandboxed = await app.evaluate(({ app, BrowserWindow }) => {
       const pid = BrowserWindow.getAllWindows()[0].webContents.getOSProcessId();
       return app.getAppMetrics().find((m) => m.pid === pid)?.sandboxed;
