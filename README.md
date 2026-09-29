@@ -94,3 +94,4 @@ E2E 自动构建独立测试模式，启动真实 Electron + SQLite + utility pr
 本次实际检查结果、独立审查修复和执行决策见 [阶段 A 验收记录](docs/superpowers/reviews/2026-09-28-phase-a-verification.md)。
 
 本次扩展的验证、设备/平台限制及独立审查见 [对话工作区语音验收记录](docs/superpowers/reviews/2026-09-28-chat-workspace-voice-verification.md)。
+# fastgpt-desktop
