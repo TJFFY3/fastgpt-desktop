@@ -1,43 +1,37 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+/** Provides the app module for the desktop application. */
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   MessageRecord,
   ProviderView,
   RunRecord,
   SessionRecord,
-} from "../../../../packages/shared/src/index";
-import { useSessions } from "./hooks/useSessions";
-import { useRunEvents } from "./hooks/useRunEvents";
-import { SessionSidebar } from "./components/SessionSidebar";
-import { ProviderSettings } from "./components/ProviderSettings";
-import { ChatView } from "./components/ChatView";
-import { Composer } from "./components/Composer";
-import { ModelPicker } from "./components/ModelPicker";
-import { useSessionRuns } from "./hooks/useSessionRuns";
-const active = [
-  "queued",
-  "running",
-  "waiting_approval",
-  "waiting_input",
-  "cancelling",
-];
+} from '../../../../packages/shared/src/index';
+import { useSessions } from './hooks/useSessions';
+import { useRunEvents } from './hooks/useRunEvents';
+import { SessionSidebar } from './components/SessionSidebar';
+import { ProviderSettings } from './components/ProviderSettings';
+import { ChatView } from './components/ChatView';
+import { Composer } from './components/Composer';
+import { ModelPicker } from './components/ModelPicker';
+import { useSessionRuns } from './hooks/useSessionRuns';
+const active = ['queued', 'running', 'waiting_approval', 'waiting_input', 'cancelling'];
+/** Performs app for this module. */
 export default function App() {
   const initiallySelected = useRef(false);
   const selection = useRef({ id: null as string | null, generation: 0 });
   const [providers, setProviders] = useState<ProviderView[]>([]),
-    [providerId, setProviderId] = useState(""),
+    [providerId, setProviderId] = useState(''),
     [selectedId, setSelectedId] = useState<string | null>(null),
-    [selectedSnapshot, setSelectedSnapshot] = useState<SessionRecord | null>(
-      null,
-    ),
-    [query, setQuery] = useState(""),
+    [selectedSnapshot, setSelectedSnapshot] = useState<SessionRecord | null>(null),
+    [query, setQuery] = useState(''),
     [archived, setArchived] = useState(false),
     [settings, setSettings] = useState(false),
-    [error, setError] = useState(""),
+    [error, setError] = useState(''),
     [messages, setMessages] = useState<MessageRecord[]>([]),
     [run, setRun] = useState<RunRecord | null>(null),
     [pendingStarts, setPendingStarts] = useState<Set<string>>(new Set());
-  const [modelSwitching,setModelSwitching]=useState(false);
-  const sessionRuns=useSessionRuns(selectedId);
+  const [modelSwitching, setModelSwitching] = useState(false);
+  const sessionRuns = useSessionRuns(selectedId);
   const selectSession = useCallback((record: SessionRecord | null) => {
     initiallySelected.current = true;
     selection.current = {
@@ -48,31 +42,26 @@ export default function App() {
     setSelectedId(record?.id ?? null);
     setRun(null);
     setMessages([]);
-    setError("");
+    setError('');
   }, []);
-  const fail = useCallback(
-      (value: string) => setError(value.replace(/^Error:\s*/, "")),
-      [],
-    ),
+  const fail = useCallback((value: string) => setError(value.replace(/^Error:\s*/, '')), []),
     { sessions, refresh } = useSessions(query, archived, fail),
     selected =
       sessions.find((s) => s.id === selectedId) ??
       (selectedSnapshot?.id === selectedId ? selectedSnapshot : undefined),
     { events, error: eventError } = useRunEvents(run?.id ?? null);
   const latestStatus =
-      events.flatMap((e) => (e.type === "status" ? [e.status] : [])).at(-1) ??
-      run?.status ??
-      null,
+      events.flatMap((e) => (e.type === 'status' ? [e.status] : [])).at(-1) ?? run?.status ?? null,
     busy =
       modelSwitching ||
-      pendingStarts.has(selectedId ?? "") ||
+      pendingStarts.has(selectedId ?? '') ||
       (!!latestStatus && active.includes(latestStatus));
   const refreshProviders = useCallback(async () => {
     try {
       const values = await window.desktop.providers.list();
       setProviders(values);
       setProviderId((current) =>
-        values.some((p) => p.id === current) ? current : (values[0]?.id ?? ""),
+        values.some((p) => p.id === current) ? current : (values[0]?.id ?? ''),
       );
     } catch (e) {
       fail(String(e));
@@ -107,8 +96,7 @@ export default function App() {
           }
         })
         .catch((e) => {
-          if (alive && selection.current.generation === generation)
-            fail(String(e));
+          if (alive && selection.current.generation === generation) fail(String(e));
         });
     return () => {
       alive = false;
@@ -121,18 +109,17 @@ export default function App() {
     void window.desktop.sessions
       .messages(selectedId)
       .then((m) => {
-        if (alive && selection.current.generation === generation)
-          setMessages(m);
+        if (alive && selection.current.generation === generation) setMessages(m);
       })
       .catch((e) => {
-        if (alive && selection.current.generation === generation)
-          fail(String(e));
+        if (alive && selection.current.generation === generation) fail(String(e));
       });
     void refresh();
     return () => {
       alive = false;
     };
   }, [latestStatus, selectedId, fail, refresh]);
+  /** Performs new Session for this module. */
   const newSession = async () => {
     if (!providerId) {
       setSettings(true);
@@ -140,11 +127,11 @@ export default function App() {
     }
     try {
       const generation = selection.current.generation;
-      setError("");
+      setError('');
       setArchived(false);
-      setQuery("");
+      setQuery('');
       const s = await window.desktop.sessions.create({
-        title: "新会话",
+        title: '新会话',
         providerId,
       });
       if (selection.current.generation === generation) selectSession(s);
@@ -153,6 +140,7 @@ export default function App() {
       fail(String(e));
     }
   };
+  /** Performs update for this module. */
   const update = async (
     id: string,
     patch: { title?: string; pinned?: boolean; archived?: boolean },
@@ -160,13 +148,13 @@ export default function App() {
     try {
       const updated = await window.desktop.sessions.update(id, patch);
       if (id === selection.current.id) setSelectedSnapshot(updated);
-      if (patch.archived !== undefined && id === selection.current.id)
-        selectSession(null);
+      if (patch.archived !== undefined && id === selection.current.id) selectSession(null);
       await refresh();
     } catch (e) {
       fail(String(e));
     }
   };
+  /** Performs remove for this module. */
   const remove = async (s: SessionRecord) => {
     if (
       !window.confirm(
@@ -182,33 +170,46 @@ export default function App() {
       fail(String(e));
     }
   };
-  const changeModel=async(id:string)=>{
-    if(busy) return;
-    if(!selectedId) {setProviderId(id);return;}
-    const sid=selectedId,generation=selection.current.generation;setModelSwitching(true);
+  /** Performs change Model for this module. */
+  const changeModel = async (id: string) => {
+    if (busy) return;
+    if (!selectedId) {
+      setProviderId(id);
+      return;
+    }
+    const sid = selectedId,
+      generation = selection.current.generation;
+    setModelSwitching(true);
     try {
-      const value=await window.desktop.sessions.update(sid,{providerId:id});
-      if(selection.current.id===sid && selection.current.generation===generation) setSelectedSnapshot(value);
+      const value = await window.desktop.sessions.update(sid, { providerId: id });
+      if (selection.current.id === sid && selection.current.generation === generation)
+        setSelectedSnapshot(value);
       await refresh();
-    } catch(e) {if(selection.current.id===sid) fail(String(e));}
-    finally {setModelSwitching(false);}
+    } catch (e) {
+      if (selection.current.id === sid) fail(String(e));
+    } finally {
+      setModelSwitching(false);
+    }
   };
+  /** Performs send for this module. */
   const send = async (text: string) => {
     if (!selectedId || busy) return false;
     const id = selectedId,
       generation = ++selection.current.generation;
+    /** Performs still Selected for this module. */
     const stillSelected = () =>
-      selection.current.id === id &&
-      selection.current.generation === generation;
+      selection.current.id === id && selection.current.generation === generation;
     setPendingStarts((previous) => new Set(previous).add(id));
-    setError("");
+    setError('');
     try {
-      const next = await window.desktop.runs.start(id, text,{attachmentIds:[],expectedSessionRevision:selected?.revision});
+      const next = await window.desktop.runs.start(id, text, {
+        attachmentIds: [],
+        expectedSessionRevision: selected?.revision,
+      });
       if (stillSelected()) setRun(next);
       const history = await window.desktop.sessions.messages(id);
       if (stillSelected()) setMessages(history);
-      if (selected?.title === "新会话")
-        await update(id, { title: text.slice(0, 30) });
+      if (selected?.title === '新会话') await update(id, { title: text.slice(0, 30) });
       await refresh();
       await sessionRuns.refresh();
       return true;
@@ -224,11 +225,9 @@ export default function App() {
     }
   };
   const runtimeError = events
-      .flatMap((e) => (e.type === "error" ? [`${e.code}: ${e.message}`] : []))
+      .flatMap((e) => (e.type === 'error' ? [`${e.code}: ${e.message}`] : []))
       .at(-1),
-    selectedProvider = providers.find(
-      (p) => p.id === (selected?.providerId ?? providerId),
-    );
+    selectedProvider = providers.find((p) => p.id === (selected?.providerId ?? providerId));
   return (
     <div className="app-shell">
       <SessionSidebar
@@ -249,22 +248,27 @@ export default function App() {
       <main className="chat-main">
         <header className="chat-header">
           <div>
-            <h2>{selected?.title ?? "Agent 工作台"}</h2>
+            <h2>{selected?.title ?? 'Agent 工作台'}</h2>
             <span className="workspace-label">
               本地空间 <span>／</span> 对话
             </span>
           </div>
-          <ModelPicker providers={providers} value={selected?.providerId ?? providerId} disabled={busy || !!selected?.archived} onChange={id=>void changeModel(id)} />
+          <ModelPicker
+            providers={providers}
+            value={selected?.providerId ?? providerId}
+            disabled={busy || !!selected?.archived}
+            onChange={(id) => void changeModel(id)}
+          />
         </header>
         {(error || eventError || runtimeError) && (
           <div role="alert" className="error-banner">
             <span>{error || eventError || runtimeError}</span>
-            <button aria-label="关闭错误" onClick={() => setError("")}>
+            <button aria-label="关闭错误" onClick={() => setError('')}>
               ×
             </button>
           </div>
         )}
-        {selectedProvider?.credentialState === "missing" && (
+        {selectedProvider?.credentialState === 'missing' && (
           <div className="credential-banner">
             此模型需要重新填写密钥。
             <button onClick={() => setSettings(true)}>打开模型设置</button>
@@ -278,24 +282,19 @@ export default function App() {
           onSettings={() => setSettings(true)}
           runs={sessionRuns.runs}
           eventsByRun={sessionRuns.eventsByRun}
-          onLoadRun={id=>void sessionRuns.loadEvents(id).catch(e=>fail(String(e)))}
+          onLoadRun={(id) => void sessionRuns.loadEvents(id).catch((e) => fail(String(e)))}
         />
         <div className="chat-bottom">
           <Composer
-            key={selectedId ?? "none"}
+            key={selectedId ?? 'none'}
             busy={busy}
-            stopping={latestStatus === "cancelling"}
+            stopping={latestStatus === 'cancelling'}
             disabled={
-              !selected ||
-              selected.archived ||
-              selectedProvider?.credentialState === "missing"
+              !selected || selected.archived || selectedProvider?.credentialState === 'missing'
             }
             onSend={send}
             onStop={() => {
-              if (run)
-                void window.desktop.runs
-                  .cancel(run.id)
-                  .catch((e) => fail(String(e)));
+              if (run) void window.desktop.runs.cancel(run.id).catch((e) => fail(String(e)));
             }}
           />
           <div className="bottom-note">

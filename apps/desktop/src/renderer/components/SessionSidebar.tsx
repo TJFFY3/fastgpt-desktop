@@ -1,5 +1,7 @@
-import { useState } from "react";
-import type { SessionRecord } from "../../../../../packages/shared/src/index";
+/** Provides the session Sidebar module for the desktop application. */
+import { useState } from 'react';
+import type { SessionRecord } from '../../../../../packages/shared/src/index';
+/** Performs session Sidebar for this module. */
 export function SessionSidebar(p: {
   sessions: SessionRecord[];
   selectedId: string | null;
@@ -17,7 +19,7 @@ export function SessionSidebar(p: {
   onDelete(session: SessionRecord): void;
 }) {
   const [editing, setEditing] = useState<string | null>(null),
-    [title, setTitle] = useState("");
+    [title, setTitle] = useState('');
   return (
     <aside className="sidebar">
       <div className="brand">
@@ -37,25 +39,20 @@ export function SessionSidebar(p: {
         onChange={(e) => p.onQuery(e.target.value)}
       />
       <div className="section-heading">
-        <span>{p.archived ? "已归档" : "我的会话"}</span>
+        <span>{p.archived ? '已归档' : '我的会话'}</span>
         <button onClick={() => p.onArchived(!p.archived)}>
-          {p.archived ? "返回会话" : "查看归档"}
+          {p.archived ? '返回会话' : '查看归档'}
         </button>
       </div>
       <div className="session-list">
         {p.sessions.map((s) => (
-          <div
-            key={s.id}
-            className={`session-item ${s.id === p.selectedId ? "selected" : ""}`}
-          >
+          <div key={s.id} className={`session-item ${s.id === p.selectedId ? 'selected' : ''}`}>
             {editing === s.id ? (
               <form
                 onSubmit={(e) => {
                   e.preventDefault();
                   if (title.trim())
-                    void p
-                      .onUpdate(s.id, { title: title.trim() })
-                      .then(() => setEditing(null));
+                    void p.onUpdate(s.id, { title: title.trim() }).then(() => setEditing(null));
                 }}
               >
                 <input
@@ -72,11 +69,8 @@ export function SessionSidebar(p: {
               </form>
             ) : (
               <>
-                <button
-                  className="session-title"
-                  onClick={() => p.onSelect(s.id)}
-                >
-                  <span>{s.pinned ? "◆" : "◇"}</span>
+                <button className="session-title" onClick={() => p.onSelect(s.id)}>
+                  <span>{s.pinned ? '◆' : '◇'}</span>
                   <span>{s.title}</span>
                 </button>
                 <details className="session-menu">
@@ -90,24 +84,13 @@ export function SessionSidebar(p: {
                     >
                       重命名
                     </button>
-                    <button
-                      onClick={() =>
-                        void p.onUpdate(s.id, { pinned: !s.pinned })
-                      }
-                    >
-                      {s.pinned ? "取消置顶" : "置顶"}
+                    <button onClick={() => void p.onUpdate(s.id, { pinned: !s.pinned })}>
+                      {s.pinned ? '取消置顶' : '置顶'}
                     </button>
-                    <button
-                      onClick={() =>
-                        void p.onUpdate(s.id, { archived: !s.archived })
-                      }
-                    >
-                      {s.archived ? "取消归档" : "归档"}
+                    <button onClick={() => void p.onUpdate(s.id, { archived: !s.archived })}>
+                      {s.archived ? '取消归档' : '归档'}
                     </button>
-                    <button
-                      className="danger-text"
-                      onClick={() => p.onDelete(s)}
-                    >
+                    <button className="danger-text" onClick={() => p.onDelete(s)}>
                       删除
                     </button>
                   </div>
@@ -117,17 +100,11 @@ export function SessionSidebar(p: {
           </div>
         ))}
         {!p.sessions.length && (
-          <p className="sidebar-empty">
-            {p.query ? "没有匹配的会话" : "从一个新会话开始"}
-          </p>
+          <p className="sidebar-empty">{p.query ? '没有匹配的会话' : '从一个新会话开始'}</p>
         )}
       </div>
       <div className="sidebar-bottom">
-        <button
-          className="settings-button"
-          aria-label="模型设置"
-          onClick={p.onSettings}
-        >
+        <button className="settings-button" aria-label="模型设置" onClick={p.onSettings}>
           ⚙ 模型设置
         </button>
         <div className="identity">

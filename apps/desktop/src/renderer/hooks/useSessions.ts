@@ -1,10 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from "react";
-import type { SessionRecord } from "../../../../../packages/shared/src/index";
-export function useSessions(
-  query: string,
-  archived: boolean,
-  onError: (message: string) => void,
-) {
+/** Provides the use Sessions module for the desktop application. */
+import { useCallback, useEffect, useRef, useState } from 'react';
+import type { SessionRecord } from '../../../../../packages/shared/src/index';
+/** Performs use Sessions for this module. */
+export function useSessions(query: string, archived: boolean, onError: (message: string) => void) {
   const [sessions, setSessions] = useState<SessionRecord[]>([]),
     revision = useRef(0);
   const refresh = useCallback(async () => {

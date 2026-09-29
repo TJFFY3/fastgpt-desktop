@@ -1,12 +1,11 @@
-import { useState } from "react";
-import type {
-  ProviderDraft,
-  ProviderView,
-} from "../../../../../packages/shared/src/index";
+/** Provides the provider Settings module for the desktop application. */
+import { useState } from 'react';
+import type { ProviderDraft, ProviderView } from '../../../../../packages/shared/src/index';
+/** Configures initial, the module data used by this workflow. */
 const initial: ProviderDraft = {
-  name: "",
-  baseUrl: "https://api.openai.com/v1",
-  modelId: "",
+  name: '',
+  baseUrl: 'https://api.openai.com/v1',
+  modelId: '',
   contextWindow: 32768,
   maxOutputTokens: 4096,
   timeoutMs: 120000,
@@ -14,10 +13,11 @@ const initial: ProviderDraft = {
   capabilities: {
     tools: false,
     temperature: false,
-    outputTokenField: "max_tokens",
-    reasoningField: "none",
+    outputTokenField: 'max_tokens',
+    reasoningField: 'none',
   },
 };
+/** Performs provider Settings for this module. */
 export function ProviderSettings({
   providers,
   onRefresh,
@@ -29,29 +29,30 @@ export function ProviderSettings({
 }) {
   const [draft, setDraft] = useState<ProviderDraft>(initial),
     [id, setId] = useState<string | undefined>(),
-    [key, setKey] = useState(""),
+    [key, setKey] = useState(''),
     [busy, setBusy] = useState(false),
-    [notice, setNotice] = useState(""),
-    [error, setError] = useState("");
-  const field = <K extends keyof ProviderDraft>(
-    name: K,
-    value: ProviderDraft[K],
-  ) => setDraft((d) => ({ ...d, [name]: value }));
+    [notice, setNotice] = useState(''),
+    [error, setError] = useState('');
+  /** Performs field for this module. */
+  const field = <K extends keyof ProviderDraft>(name: K, value: ProviderDraft[K]) =>
+    setDraft((d) => ({ ...d, [name]: value }));
+  /** Performs edit for this module. */
   const edit = (p?: ProviderView) => {
     setId(p?.id);
-    setKey("");
-    setError("");
-    setNotice("");
+    setKey('');
+    setError('');
+    setNotice('');
     if (p) {
       const { id: _id, revision: _revision, credentialState: _state, ...value } = p;
       setDraft(value);
     } else setDraft(initial);
   };
+  /** Performs action for this module. */
   const action = async (fn: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);
-    setError("");
-    setNotice("");
+    setError('');
+    setNotice('');
     try {
       await fn();
     } catch (e) {
@@ -62,12 +63,7 @@ export function ProviderSettings({
   };
   return (
     <div className="modal-backdrop">
-      <section
-        className="settings-modal"
-        role="dialog"
-        aria-modal="true"
-        aria-label="模型设置"
-      >
+      <section className="settings-modal" role="dialog" aria-modal="true" aria-label="模型设置">
         <header>
           <div>
             <div className="eyebrow">MODEL CONNECTIONS</div>
@@ -79,7 +75,7 @@ export function ProviderSettings({
             aria-label="关闭设置"
             disabled={busy}
             onClick={() => {
-              setKey("");
+              setKey('');
               onClose();
             }}
           >
@@ -88,27 +84,20 @@ export function ProviderSettings({
         </header>
         <div className="settings-layout">
           <aside>
-            <button
-              className="new-provider"
-              disabled={busy}
-              onClick={() => edit()}
-            >
+            <button className="new-provider" disabled={busy} onClick={() => edit()}>
               ＋ 添加模型
             </button>
             {providers.map((p) => (
-              <div
-                key={p.id}
-                className={`provider-card ${id === p.id ? "selected" : ""}`}
-              >
+              <div key={p.id} className={`provider-card ${id === p.id ? 'selected' : ''}`}>
                 <button disabled={busy} onClick={() => edit(p)}>
                   <strong>{p.name}</strong>
                   <small>{p.modelId}</small>
                   <span>
-                    {p.credentialState === "persistent"
-                      ? "密钥安全保存"
-                      : p.credentialState === "session_only"
-                        ? "密钥仅本次运行可用"
-                        : "需要重新填写密钥"}
+                    {p.credentialState === 'persistent'
+                      ? '密钥安全保存'
+                      : p.credentialState === 'session_only'
+                        ? '密钥仅本次运行可用'
+                        : '需要重新填写密钥'}
                   </span>
                 </button>
                 <button
@@ -116,11 +105,7 @@ export function ProviderSettings({
                   className="provider-remove"
                   aria-label={`删除模型 ${p.name}`}
                   onClick={() => {
-                    if (
-                      window.confirm(
-                        `删除模型“${p.name}”？已被会话使用的模型不能删除。`,
-                      )
-                    )
+                    if (window.confirm(`删除模型“${p.name}”？已被会话使用的模型不能删除。`))
                       void action(async () => {
                         await window.desktop.providers.remove(p.id);
                         if (id === p.id) edit();
@@ -133,26 +118,19 @@ export function ProviderSettings({
               </div>
             ))}
             <p className="settings-hint">
-              API Key
-              不回显、不进入浏览器存储。安全密钥库不可用时仅在本次应用运行中保存。
+              API Key 不回显、不进入浏览器存储。安全密钥库不可用时仅在本次应用运行中保存。
             </p>
           </aside>
           <form
             onSubmit={(e) => {
               e.preventDefault();
               void action(async () => {
-                const p = await window.desktop.providers.save(
-                  draft,
-                  key || undefined,
-                  id,
-                );
-                setKey("");
+                const p = await window.desktop.providers.save(draft, key || undefined, id);
+                setKey('');
                 setId(p.id);
                 await onRefresh();
                 setNotice(
-                  p.credentialState === "session_only"
-                    ? "密钥仅本次运行可用"
-                    : "配置已保存",
+                  p.credentialState === 'session_only' ? '密钥仅本次运行可用' : '配置已保存',
                 );
               });
             }}
@@ -165,7 +143,7 @@ export function ProviderSettings({
                   required
                   maxLength={100}
                   value={draft.name}
-                  onChange={(e) => field("name", e.target.value)}
+                  onChange={(e) => field('name', e.target.value)}
                 />
               </label>
               <label>
@@ -175,7 +153,7 @@ export function ProviderSettings({
                   required
                   value={draft.modelId}
                   placeholder="服务端的模型名称"
-                  onChange={(e) => field("modelId", e.target.value)}
+                  onChange={(e) => field('modelId', e.target.value)}
                 />
               </label>
               <label className="full">
@@ -185,12 +163,9 @@ export function ProviderSettings({
                   type="url"
                   required
                   value={draft.baseUrl}
-                  onChange={(e) => field("baseUrl", e.target.value)}
+                  onChange={(e) => field('baseUrl', e.target.value)}
                 />
-                <small>
-                  填写 API 根地址（如 /v1）；也可填写完整 /chat/completions
-                  地址。
-                </small>
+                <small>填写 API 根地址（如 /v1）；也可填写完整 /chat/completions 地址。</small>
               </label>
               <label className="full">
                 API Key
@@ -201,7 +176,7 @@ export function ProviderSettings({
                   spellCheck={false}
                   value={key}
                   required={!id}
-                  placeholder={id ? "留空保留原密钥，输入替换" : "填写 API Key"}
+                  placeholder={id ? '留空保留原密钥，输入替换' : '填写 API Key'}
                   onChange={(e) => setKey(e.target.value)}
                 />
               </label>
@@ -213,9 +188,7 @@ export function ProviderSettings({
                   max={2000000}
                   required
                   value={draft.contextWindow}
-                  onChange={(e) =>
-                    field("contextWindow", Number(e.target.value))
-                  }
+                  onChange={(e) => field('contextWindow', Number(e.target.value))}
                 />
               </label>
               <label>
@@ -226,9 +199,7 @@ export function ProviderSettings({
                   required
                   max={draft.contextWindow - 1}
                   value={draft.maxOutputTokens}
-                  onChange={(e) =>
-                    field("maxOutputTokens", Number(e.target.value))
-                  }
+                  onChange={(e) => field('maxOutputTokens', Number(e.target.value))}
                 />
               </label>
               <label>
@@ -238,9 +209,7 @@ export function ProviderSettings({
                   min={1}
                   max={600}
                   value={draft.timeoutMs / 1000}
-                  onChange={(e) =>
-                    field("timeoutMs", Number(e.target.value) * 1000)
-                  }
+                  onChange={(e) => field('timeoutMs', Number(e.target.value) * 1000)}
                 />
               </label>
               <label>
@@ -248,25 +217,32 @@ export function ProviderSettings({
                 <select
                   value={draft.capabilities.outputTokenField}
                   onChange={(e) =>
-                    field("capabilities", {
+                    field('capabilities', {
                       ...draft.capabilities,
-                      outputTokenField: e.target.value as
-                        | "max_tokens"
-                        | "max_completion_tokens",
+                      outputTokenField: e.target.value as 'max_tokens' | 'max_completion_tokens',
                     })
                   }
                 >
                   <option value="max_tokens">max_tokens</option>
-                  <option value="max_completion_tokens">
-                    max_completion_tokens
-                  </option>
+                  <option value="max_completion_tokens">max_completion_tokens</option>
                 </select>
               </label>
             </div>
             <div className="capability-box">
-              <label>公开思考字段
-                <select aria-label="公开思考字段" value={draft.capabilities.reasoningField} onChange={e=>field("capabilities",{...draft.capabilities,reasoningField:e.target.value as "none"|"reasoning_content"})}>
-                  <option value="none">不读取（默认）</option><option value="reasoning_content">reasoning_content（服务需支持）</option>
+              <label>
+                公开思考字段
+                <select
+                  aria-label="公开思考字段"
+                  value={draft.capabilities.reasoningField}
+                  onChange={(e) =>
+                    field('capabilities', {
+                      ...draft.capabilities,
+                      reasoningField: e.target.value as 'none' | 'reasoning_content',
+                    })
+                  }
+                >
+                  <option value="none">不读取（默认）</option>
+                  <option value="reasoning_content">reasoning_content（服务需支持）</option>
                 </select>
               </label>
               <label>
@@ -274,7 +250,7 @@ export function ProviderSettings({
                   type="checkbox"
                   checked={draft.capabilities.tools}
                   onChange={(e) =>
-                    field("capabilities", {
+                    field('capabilities', {
                       ...draft.capabilities,
                       tools: e.target.checked,
                     })
@@ -287,7 +263,7 @@ export function ProviderSettings({
                   type="checkbox"
                   checked={draft.capabilities.temperature}
                   onChange={(e) =>
-                    field("capabilities", {
+                    field('capabilities', {
                       ...draft.capabilities,
                       temperature: e.target.checked,
                     })
@@ -299,13 +275,11 @@ export function ProviderSettings({
                 <input
                   type="checkbox"
                   checked={draft.allowInsecureHttp}
-                  onChange={(e) => field("allowInsecureHttp", e.target.checked)}
+                  onChange={(e) => field('allowInsecureHttp', e.target.checked)}
                 />
                 允许明文 HTTP（仅可信服务）
               </label>
-              <small>
-                不确定模型能力时先关闭可选参数。明文 HTTP 会暴露请求和密钥。
-              </small>
+              <small>不确定模型能力时先关闭可选参数。明文 HTTP 会暴露请求和密钥。</small>
             </div>
             {error && (
               <p className="notice error" role="alert">
@@ -325,7 +299,7 @@ export function ProviderSettings({
                   void action(async () => {
                     const result = await window.desktop.providers.test(id!);
                     setNotice(
-                      `连接成功 · 工具能力：${result.tools === true ? "已验证" : result.tools === false ? "不支持" : "尚未确认"}`,
+                      `连接成功 · 工具能力：${result.tools === true ? '已验证' : result.tools === false ? '不支持' : '尚未确认'}`,
                     );
                   })
                 }
@@ -333,7 +307,7 @@ export function ProviderSettings({
                 测试连接
               </button>
               <button className="primary" type="submit" disabled={busy}>
-                {busy ? "处理中…" : "保存配置"}
+                {busy ? '处理中…' : '保存配置'}
               </button>
             </footer>
           </form>

@@ -1,11 +1,12 @@
+/* Defines the desktop renderer's shared controls and chat-workspace layout. */
 :root {
   font-family:
     Inter,
     -apple-system,
     BlinkMacSystemFont,
-    "Segoe UI",
-    "PingFang SC",
-    "Microsoft YaHei",
+    'Segoe UI',
+    'PingFang SC',
+    'Microsoft YaHei',
     sans-serif;
   color: #243044;
   background: #f7f8fa;
@@ -73,6 +74,7 @@ summary:focus-visible {
 .danger-text {
   color: #c84444;
 }
+/* Lays out the persistent session navigation rail. */
 .app-shell {
   display: flex;
   height: 100vh;
@@ -270,6 +272,7 @@ summary:focus-visible {
   border-radius: 50%;
   margin-left: auto;
 }
+/* Styles the active conversation pane, its transcript, and composer controls. */
 .chat-main {
   display: flex;
   flex-direction: column;
@@ -407,6 +410,7 @@ summary:focus-visible {
   color: #a4aebd;
   font-size: 11px;
 }
+/* Presents messages, tool activity, run traces, and approval interactions. */
 .messages {
   max-width: 840px;
   margin: auto;
@@ -471,15 +475,60 @@ summary:focus-visible {
   color: #929caf;
   font-size: 11px;
 }
-.run-trace { max-width:84%; margin:0 0 20px; padding:12px 16px; border:1px solid #e3e8f1; border-radius:12px; background:#f7f9fc; font-size:12px; }
-.run-trace > summary {display:flex; flex-wrap:wrap; gap:12px; align-items:center; cursor:pointer; color:#65748c;}
-.run-trace > summary > span:first-child {color:#33435e; font-weight:600;}
-.run-trace pre {white-space:pre-wrap; overflow-wrap:anywhere; max-height:320px; overflow:auto; font:12px/1.7 ui-monospace,monospace;}
-.trace-model,.trace-hint {color:#7a879b; margin:10px 0;}
-.trace-step,.trace-reasoning,.trace-command,.trace-approval {margin-top:10px; padding-top:10px; border-top:1px solid #e3e8f1;}
-.trace-step summary {display:flex; gap:12px; cursor:pointer;}
-.trace-step summary span {color:#7a879b;}
-.trace-error {color:#c74b54;}
+.run-trace {
+  max-width: 84%;
+  margin: 0 0 20px;
+  padding: 12px 16px;
+  border: 1px solid #e3e8f1;
+  border-radius: 12px;
+  background: #f7f9fc;
+  font-size: 12px;
+}
+.run-trace > summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+  cursor: pointer;
+  color: #65748c;
+}
+.run-trace > summary > span:first-child {
+  color: #33435e;
+  font-weight: 600;
+}
+.run-trace pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 320px;
+  overflow: auto;
+  font:
+    12px/1.7 ui-monospace,
+    monospace;
+}
+.trace-model,
+.trace-hint {
+  color: #7a879b;
+  margin: 10px 0;
+}
+.trace-step,
+.trace-reasoning,
+.trace-command,
+.trace-approval {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid #e3e8f1;
+}
+.trace-step summary {
+  display: flex;
+  gap: 12px;
+  cursor: pointer;
+}
+.trace-step summary span {
+  color: #7a879b;
+}
+.trace-error {
+  color: #c74b54;
+}
 .stored-tool summary {
   cursor: pointer;
 }
@@ -490,6 +539,7 @@ summary:focus-visible {
   font-size: 11px;
   line-height: 1.6;
 }
+/* Anchors the message composer and run-detail controls below the transcript. */
 .chat-bottom {
   max-width: 840px;
   width: 100%;
@@ -626,6 +676,7 @@ summary:focus-visible {
   padding: 3px 8px;
   border-color: #e8dcbe;
 }
+/* Styles the provider-settings dialog and its editable provider cards. */
 .modal-backdrop {
   position: fixed;
   inset: 0;

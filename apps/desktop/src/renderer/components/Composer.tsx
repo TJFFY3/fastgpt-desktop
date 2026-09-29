@@ -1,4 +1,6 @@
-import { useRef, useState } from "react";
+/** Provides the composer module for the desktop application. */
+import { useRef, useState } from 'react';
+/** Performs composer for this module. */
 export function Composer({
   busy,
   stopping,
@@ -12,14 +14,15 @@ export function Composer({
   onSend(text: string): Promise<boolean>;
   onStop(): void;
 }) {
-  const [text, setText] = useState(""),
+  const [text, setText] = useState(''),
     composing = useRef(false),
     sending = useRef(false);
+  /** Performs send for this module. */
   const send = async () => {
     if (sending.current || busy || disabled || !text.trim()) return;
     sending.current = true;
     try {
-      if (await onSend(text.trim())) setText("");
+      if (await onSend(text.trim())) setText('');
     } finally {
       sending.current = false;
     }
@@ -40,7 +43,7 @@ export function Composer({
         }}
         onKeyDown={(e) => {
           if (
-            e.key === "Enter" &&
+            e.key === 'Enter' &&
             !e.shiftKey &&
             !e.nativeEvent.isComposing &&
             !composing.current &&
@@ -55,7 +58,7 @@ export function Composer({
         <span>模型回复仅作参考 · 工具执行受权限限制</span>
         {busy ? (
           <button className="stop" disabled={stopping} onClick={onStop}>
-            {stopping ? "停止中…" : "停止"}
+            {stopping ? '停止中…' : '停止'}
           </button>
         ) : (
           <button
