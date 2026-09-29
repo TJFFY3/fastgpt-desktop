@@ -1,4 +1,5 @@
-import { randomUUID } from "node:crypto";
+/** Provides the provider repository module for the desktop application. */
+import { randomUUID } from 'node:crypto';
 import {
   AppError,
   providerDraftSchema,
@@ -6,11 +7,13 @@ import {
   type ModelProfile,
   type Namespace,
   type ProviderDraft,
-} from "../../shared/src/index";
-import type { Database } from "./database";
-import { namespaceKey } from "./namespace";
+} from '../../shared/src/index';
+import type { Database } from './database';
+import { namespaceKey } from './namespace';
+/** Coordinates provider Repository responsibilities for this module. */
 export class ProviderRepository {
   constructor(private db: Database) {}
+  /** Handles save within this module's workflow. */
   save(
     n: Namespace,
     draft: ProviderDraft,
@@ -18,6 +21,7 @@ export class ProviderRepository {
     id?: string,
   ): ModelProfile {
     if (id) this.get(n, id);
+    /** Configures profile, the module data used by this workflow. */
     const profile = {
       ...providerDraftSchema.parse(draft),
       id: id ?? randomUUID(),
@@ -26,38 +30,37 @@ export class ProviderRepository {
     };
     this.db.raw
       .prepare(
-        "INSERT INTO providers(namespace_key,id,data) VALUES(?,?,?) ON CONFLICT(namespace_key,id) DO UPDATE SET data=excluded.data",
+        'INSERT INTO providers(namespace_key,id,data) VALUES(?,?,?) ON CONFLICT(namespace_key,id) DO UPDATE SET data=excluded.data',
       )
       .run(namespaceKey(n), profile.id, JSON.stringify(profile));
     return profile;
   }
+  /** Handles get within this module's workflow. */
   get(n: Namespace, id: string): ModelProfile {
     const row = this.db.raw
-      .prepare("SELECT data FROM providers WHERE namespace_key=? AND id=?")
+      .prepare('SELECT data FROM providers WHERE namespace_key=? AND id=?')
       .get(namespaceKey(n), id);
-    if (!row) throw new AppError("NOT_FOUND", "模型配置不存在");
+    if (!row) throw new AppError('NOT_FOUND', '模型配置不存在');
     return modelProfileSchema.parse(JSON.parse(row.data as string));
   }
+  /** Handles list within this module's workflow. */
   list(n: Namespace): ModelProfile[] {
     return this.db.raw
-      .prepare(
-        "SELECT data FROM providers WHERE namespace_key=? ORDER BY rowid",
-      )
+      .prepare('SELECT data FROM providers WHERE namespace_key=? ORDER BY rowid')
       .all(namespaceKey(n))
       .map((r) => modelProfileSchema.parse(JSON.parse(r.data as string)));
   }
+  /** Handles remove within this module's workflow. */
   remove(n: Namespace, id: string) {
     this.get(n, id);
     if (
       this.db.raw
-        .prepare(
-          "SELECT 1 FROM sessions WHERE namespace_key=? AND provider_id=?",
-        )
+        .prepare('SELECT 1 FROM sessions WHERE namespace_key=? AND provider_id=?')
         .get(namespaceKey(n), id)
     )
-      throw new AppError("INVALID_INPUT", "请先删除使用该模型的会话");
+      throw new AppError('INVALID_INPUT', '请先删除使用该模型的会话');
     this.db.raw
-      .prepare("DELETE FROM providers WHERE namespace_key=? AND id=?")
+      .prepare('DELETE FROM providers WHERE namespace_key=? AND id=?')
       .run(namespaceKey(n), id);
   }
 }
