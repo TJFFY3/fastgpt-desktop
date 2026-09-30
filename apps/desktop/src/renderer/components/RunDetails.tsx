@@ -1,6 +1,8 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
 import type { RunEvent, RunStatus } from '../../../../../packages/shared/src/index';
 /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+/* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
 export const statusLabel: Record<RunStatus, string> = {
   queued: '等待运行',
   running: '运行中',
@@ -13,6 +15,7 @@ export const statusLabel: Record<RunStatus, string> = {
   interrupted: '已中断',
 };
 /** Initializes the module operation and connects it to its required lifecycle dependencies. */
+/* 中文：初始化模块操作，并连接执行所需的生命周期依赖。 */
 export function RunDetails({ status, events }: { status: RunStatus | null; events: RunEvent[] }) {
   const calls = events.filter((e) => e.type === 'tool_started');
   return (

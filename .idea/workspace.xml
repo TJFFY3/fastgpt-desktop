@@ -1,97 +1,112 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="35042522-c4ce-4115-b110-1ce6bb28d4e0" name="Changes" comment="" />
+    <list default="true" id="7fc375e5-3542-4588-b52d-16b1e9425275" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/.gitignore" beforeDir="false" afterPath="$PROJECT_DIR$/.gitignore" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/native/safe-files-posix.c" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/native/safe-files-posix.c" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/agent-service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/agent-service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/build-flags.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/build-flags.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/credentials.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/credentials.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/files/artifact-store.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/files/artifact-store.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/files/path-policy.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/files/path-policy.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/files/safe-file-ops.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/files/safe-file-ops.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/ipc.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/ipc.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/principal.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/principal.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/protocol.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/protocol.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/provider-service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/provider-service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/run-clock.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/run-clock.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/run-start-service.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/run-start-service.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/tool-gateway.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/tool-gateway.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/window.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/window.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/main/worker-supervisor.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/main/worker-supervisor.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/preload/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/preload/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/App.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/App.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/ChatView.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/ChatView.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/Composer.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/Composer.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/ModelPicker.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/ModelPicker.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/ProviderSettings.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/ProviderSettings.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/RunDetails.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/RunDetails.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/RunTrace.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/RunTrace.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/components/SessionSidebar.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/components/SessionSidebar.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/env.d.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/env.d.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useRunEvents.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useRunEvents.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useRunTimer.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useRunTimer.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useSessionRuns.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useSessionRuns.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useSessions.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/hooks/useSessions.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/main.tsx" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/main.tsx" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/renderer/styles.css" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/renderer/styles.css" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/apps/desktop/src/worker/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/apps/desktop/src/worker/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/agent-core/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/agent-core/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/agent-core/src/runner.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/agent-core/src/runner.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/agent-core/src/tool-policy.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/agent-core/src/tool-policy.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/agent-core/src/tool-registry.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/agent-core/src/tool-registry.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/model-adapter/src/chat-completions.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/model-adapter/src/chat-completions.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/model-adapter/src/endpoint.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/model-adapter/src/endpoint.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/model-adapter/src/errors.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/model-adapter/src/errors.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/model-adapter/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/model-adapter/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/model-adapter/src/sse.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/model-adapter/src/sse.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/desktop-api.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/desktop-api.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/errors.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/errors.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/feature-schemas.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/feature-schemas.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/feature-types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/feature-types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/schemas.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/schemas.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/types.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/types.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/shared/src/worker-protocol.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/shared/src/worker-protocol.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/approval-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/approval-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/attachment-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/attachment-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/credential-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/credential-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/database.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/database.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/index.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/index.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/migrations.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/migrations.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/namespace.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/namespace.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/provider-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/provider-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/run-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/run-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/session-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/session-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/transcription-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/transcription-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/src/workspace-repository.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/src/workspace-repository.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/packages/storage/tests/feature-migration.test.ts" beforeDir="false" afterPath="$PROJECT_DIR$/packages/storage/tests/feature-migration.test.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/e2e/desktop.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/e2e/desktop.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/e2e/run-trace.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/e2e/run-trace.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/e2e/security.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/e2e/security.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/e2e/session-controls.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/e2e/session-controls.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/e2e/session-recovery.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/e2e/session-recovery.spec.ts" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/tests/e2e/session-switch.spec.ts" beforeDir="false" afterPath="$PROJECT_DIR$/tests/e2e/session-switch.spec.ts" afterDir="false" />
+    </list>
     <option name="SHOW_DIALOG" value="false" />
     <option name="HIGHLIGHT_CONFLICTS" value="true" />
     <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
     <option name="LAST_RESOLUTION" value="IGNORE" />
   </component>
+  <component name="ChangesViewManager">
+    <option name="groupingKeys">
+      <option value="directory" />
+      <option value="module" />
+      <option value="repository" />
+    </option>
+  </component>
   <component name="Git.Settings">
     <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
   </component>
-  <component name="ProjectColorInfo"><![CDATA[{
-  "associatedIndex": 4,
-  "fromUser": false
-}]]></component>
-  <component name="ProjectId" id="3JwelvJsTlcrmmcpvh1JTS1kvhe" />
-  <component name="ProjectViewState">
-    <option name="hideEmptyMiddlePackages" value="true" />
-    <option name="showLibraryContents" value="true" />
-  </component>
   <component name="PropertiesComponent"><![CDATA[{
   "keyToString": {
-    "ModuleVcsDetector.initialDetectionPerformed": "true",
-    "RunOnceActivity.ShowReadmeOnStart": "true",
-    "RunOnceActivity.git.unshallow": "true",
-    "RunOnceActivity.go.formatter.settings.were.checked": "true",
-    "RunOnceActivity.typescript.service.memoryLimit.init": "true",
-    "codeWithMe.voiceChat.enabledByDefault": "false",
+    "Git.Working.Tree.Tab.closed.by.user": "closed",
     "git-widget-placeholder": "main",
-    "kotlin-language-version-configured": "true",
-    "last_opened_file_path": "/Users/sealos/Project/fastgpt-desktop",
-    "nodejs_package_manager_path": "npm",
-    "ts.external.directory.path": "/Users/sealos/Project/fastgpt-desktop/node_modules/typescript/lib"
+    "ts.external.directory.path": "/Applications/IntelliJ IDEA.app/Contents/plugins/javascript-plugin/jsLanguageServicesImpl/external"
   }
 }]]></component>
-  <component name="SharedIndexes">
-    <attachedChunks>
-      <set>
-        <option value="bundled-jdk-30f59d01ecdd-34e2839f716b-intellij.indexing.shared.core-IU-262.9437.185" />
-      </set>
-    </attachedChunks>
-  </component>
   <component name="TaskManager">
-    <task active="true" id="Default" summary="Default task">
-      <changelist id="35042522-c4ce-4115-b110-1ce6bb28d4e0" name="Changes" comment="" />
-      <created>1790576713604</created>
-      <option name="number" value="Default" />
-      <option name="presentableId" value="Default" />
-      <updated>1790576713604</updated>
-    </task>
     <servers />
   </component>
-  <component name="TypeScriptGeneratedFilesManager">
-    <option name="version" value="3" />
-  </component>
   <component name="Vcs.Log.Tabs.Properties">
-    <option name="RECENT_FILTERS">
-      <map>
-        <entry key="Branch">
-          <value>
-            <list>
-              <RecentGroup>
-                <option name="FILTER_VALUES">
-                  <option value="main" />
-                </option>
-              </RecentGroup>
-              <RecentGroup>
-                <option name="FILTER_VALUES">
-                  <option value="feat/agent-foundation" />
-                </option>
-              </RecentGroup>
-            </list>
-          </value>
-        </entry>
-      </map>
-    </option>
     <option name="TAB_STATES">
       <map>
         <entry key="MAIN">
           <value>
-            <State>
-              <option name="FILTERS">
-                <map>
-                  <entry key="branch">
-                    <value>
-                      <list>
-                        <option value="main" />
-                      </list>
-                    </value>
-                  </entry>
-                </map>
-              </option>
-            </State>
+            <State />
           </value>
         </entry>
       </map>

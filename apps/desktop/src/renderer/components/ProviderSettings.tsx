@@ -1,7 +1,10 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
-import { useState } from 'react';
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
+import { useRef, useState } from 'react';
+import { useDialogFocus } from '../hooks/useDialogFocus';
 import type { ProviderDraft, ProviderView } from '../../../../../packages/shared/src/index';
 /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+/* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
 const initial: ProviderDraft = {
   name: '',
   baseUrl: 'https://api.openai.com/v1',
@@ -18,6 +21,7 @@ const initial: ProviderDraft = {
   },
 };
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function ProviderSettings({
   providers,
   onRefresh,
@@ -33,10 +37,22 @@ export function ProviderSettings({
     [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(''),
     [error, setError] = useState('');
+  const dialog = useRef<HTMLElement>(null);
+  useDialogFocus(
+    dialog,
+    true,
+    () => {
+      setKey('');
+      onClose();
+    },
+    busy,
+  );
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   const field = <K extends keyof ProviderDraft>(name: K, value: ProviderDraft[K]) =>
     setDraft((d) => ({ ...d, [name]: value }));
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   const edit = (p?: ProviderView) => {
     setId(p?.id);
     setKey('');
@@ -48,6 +64,7 @@ export function ProviderSettings({
     } else setDraft(initial);
   };
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   const action = async (fn: () => Promise<void>) => {
     if (busy) return;
     setBusy(true);
@@ -63,7 +80,13 @@ export function ProviderSettings({
   };
   return (
     <div className="modal-backdrop">
-      <section className="settings-modal" role="dialog" aria-modal="true" aria-label="模型设置">
+      <section
+        className="settings-modal"
+        ref={dialog}
+        role="dialog"
+        aria-modal="true"
+        aria-label="模型设置"
+      >
         <header>
           <div>
             <div className="eyebrow">MODEL CONNECTIONS</div>

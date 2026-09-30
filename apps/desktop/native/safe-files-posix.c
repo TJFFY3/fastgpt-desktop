@@ -1,5 +1,6 @@
 /* Fixed trusted file operations. No shell, plugins, model code, or archive
  * extraction. */
+/* 中文：提供固定且可信的文件操作，不执行 Shell、插件、模型代码或压缩包解压。 */
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -33,13 +34,16 @@ typedef SHA256_CTX Hash;
 #endif
 #define MAXFILE (100LL * 1024 * 1024)
 /* Tracks destination descriptors that cleanup must remove after a failed write. */
+/* 中文：记录写入目标的文件描述符，以便失败时清理本进程创建的文件。 */
 static struct {
   int dir, fd;
   char name[256];
 } owned[2];
 /* Counts the active cleanup entries in the bounded ownership registry. */
+/* 中文：记录有界清理列表中当前有效的条目数量。 */
 static int owned_count = 0;
 /* Performs cleanup for the native filesystem helper. */
+/* 中文：根据文件身份校验结果，清理失败操作创建且仍由本进程持有的文件。 */
 static void cleanup(void) {
   for (int i = 0; i < owned_count; i++) {
     struct stat a, b;
@@ -50,12 +54,14 @@ static void cleanup(void) {
   }
 }
 /* Performs fail for the native filesystem helper. */
+/* 中文：清理临时文件并输出错误码，以失败状态退出。 */
 static void fail(const char *code) {
   cleanup();
   fprintf(stderr, "%s\n", code);
   exit(2);
 }
 /* Performs interrupted for the native filesystem helper. */
+/* 中文：响应中断信号，清理临时文件并终止进程。 */
 static void interrupted(int sig) {
   (void)sig;
   cleanup();
@@ -63,6 +69,7 @@ static void interrupted(int sig) {
   _exit(2);
 }
 /* Performs track for the native filesystem helper. */
+/* 中文：保存本次操作创建的文件及父目录描述符，供失败清理使用。 */
 static void track(int dir, int fd, const char *name) {
   if (owned_count >= 2 || strlen(name) > 255)
     fail("SAFE_FILES_FAILED");
@@ -72,11 +79,13 @@ static void track(int dir, int fd, const char *name) {
   owned_count++;
 }
 /* Performs same for the native filesystem helper. */
+/* 中文：比较设备、节点、大小和修改时间，判断文件身份与版本是否一致。 */
 static int same(struct stat a, struct stat b) {
   return a.st_dev == b.st_dev && a.st_ino == b.st_ino &&
          a.st_size == b.st_size && MT(a) == MT(b) && CT(a) == CT(b);
 }
 /* Performs path ok for the native filesystem helper. */
+/* 中文：校验相对路径，拒绝路径穿越、非法字符和超长片段。 */
 static void path_ok(const char *path) {
   if (!*path || strlen(path) > 1024 || *path == '/')
     fail("UNSAFE_PATH");
@@ -97,7 +106,9 @@ static void path_ok(const char *path) {
 }
 /* Walk from '/' or an already-authorized fd, refusing every symlink component.
  */
+/* 中文：从根目录或已授权的目录描述符开始逐级访问，拒绝任何符号链接路径片段。 */
 /* Performs directory for the native filesystem helper. */
+/* 中文：逐级打开目录，拒绝符号链接并返回最终目录描述符。 */
 static int directory(int base, const char *path) {
   int fd = dup(base);
   char *copy = strdup(path), *save = NULL;
@@ -117,6 +128,7 @@ static int directory(int base, const char *path) {
   return fd;
 }
 /* Performs absolute dir for the native filesystem helper. */
+/* 中文：从文件系统根目录安全打开指定绝对目录。 */
 static int absolute_dir(const char *path) {
   if (*path != '/')
     fail("UNSAFE_PATH");
@@ -126,6 +138,7 @@ static int absolute_dir(const char *path) {
   return fd;
 }
 /* Performs parent for the native filesystem helper. */
+/* 中文：解析工作区相对路径，返回父目录描述符和文件名。 */
 static int parent(int root, const char *path, char **name) {
   path_ok(path);
   char *copy = strdup(path), *slash = strrchr(copy, '/');
@@ -144,6 +157,7 @@ static int parent(int root, const char *path, char **name) {
   return fd;
 }
 /* Performs absolute parent for the native filesystem helper. */
+/* 中文：解析绝对文件路径，安全打开父目录并校验文件名。 */
 static int absolute_parent(const char *path, char **name) {
   char *copy = strdup(path), *slash = strrchr(copy, '/');
   if (!slash || slash == copy)
@@ -156,6 +170,7 @@ static int absolute_parent(const char *path, char **name) {
   return fd;
 }
 /* Performs regular for the native filesystem helper. */
+/* 中文：确认描述符指向单硬链接的普通文件，并校验文件大小限制。 */
 static struct stat regular(int fd) {
   struct stat s;
   if (fstat(fd, &s) || !S_ISREG(s.st_mode) || s.st_nlink != 1)
@@ -165,6 +180,7 @@ static struct stat regular(int fd) {
   return s;
 }
 /* Performs input file for the native filesystem helper. */
+/* 中文：以拒绝符号链接的方式打开输入文件，并检查文件类型。 */
 static int input_file(int dir, const char *name) {
   int fd = openat(dir, name, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);
   if (fd < 0)
@@ -173,6 +189,7 @@ static int input_file(int dir, const char *name) {
   return fd;
 }
 /* Performs write all for the native filesystem helper. */
+/* 中文：循环写入完整缓冲区，处理被信号中断的写入操作。 */
 static void write_all(int fd, const void *buffer, size_t size) {
   const unsigned char *p = buffer;
   while (size) {
@@ -186,6 +203,7 @@ static void write_all(int fd, const void *buffer, size_t size) {
   }
 }
 /* Performs digest copy for the native filesystem helper. */
+/* 中文：按大小上限读取文件、计算 SHA-256，并按需复制到输出文件。 */
 static void digest_copy(int in, int out, int64_t limit, char hex[65]) {
   unsigned char buffer[65536], digest[32];
   Hash hash;
@@ -214,12 +232,14 @@ static void digest_copy(int in, int out, int64_t limit, char hex[65]) {
   hex[64] = 0;
 }
 /* Performs unchanged for the native filesystem helper. */
+/* 中文：重新检查文件状态，确认读取期间文件未发生变化。 */
 static void unchanged(int fd, struct stat old) {
   struct stat now = regular(fd);
   if (!same(now, old))
     fail("SOURCE_CHANGED");
 }
 /* Performs fingerprint for the native filesystem helper. */
+/* 中文：输出文件摘要和身份信息组成的 JSON 指纹。 */
 static void fingerprint(struct stat s, const char *hash) {
   printf("{\"sha256\":\"%s\",\"size\":%jd,\"device\":\"%ju\",\"inode\":\"%ju\","
          "\"mtimeNs\":\"%" PRId64 "\"}",
@@ -227,6 +247,7 @@ static void fingerprint(struct stat s, const char *hash) {
          MT(s));
 }
 /* Performs json string for the native filesystem helper. */
+/* 中文：转义并输出 JSON 字符串中的特殊字符。 */
 static void json_string(const char *s) {
   putchar('"');
   for (const unsigned char *p = (const unsigned char *)s; *p; p++) {
@@ -241,6 +262,7 @@ static void json_string(const char *s) {
   putchar('"');
 }
 /* Performs number for the native filesystem helper. */
+/* 中文：解析非负整数参数，拒绝非法格式和溢出。 */
 static int64_t number(const char *s) {
   char *end;
   errno = 0;
@@ -250,9 +272,11 @@ static int64_t number(const char *s) {
   return n;
 }
 /* Counts scanned entries while enforcing the caller-provided workspace limits. */
+/* 中文：统计已扫描条目，并执行调用方指定的工作区数量和大小限制。 */
 static int entries = 0;
 static int64_t total = 0, maxentries, maxfile, maxtotal;
 /* Performs scan for the native filesystem helper. */
+/* 中文：递归扫描目录，校验文件安全性和资源上限并输出文件清单。 */
 static void scan(int dir, const char *prefix) {
   struct stat before;
   if (fstat(dir, &before))
@@ -312,6 +336,7 @@ static void scan(int dir, const char *prefix) {
     fail("SOURCE_CHANGED");
 }
 /* Performs check expected for the native filesystem helper. */
+/* 中文：比较当前文件指纹与预期版本，发现冲突时终止操作。 */
 static void check_expected(int fd, const char *expected) {
   struct stat s = regular(fd);
   char actual[65], text[256];
@@ -324,6 +349,7 @@ static void check_expected(int fd, const char *expected) {
     fail("FILE_CONFLICT");
 }
 /* Performs stable parent for the native filesystem helper. */
+/* 中文：重新打开父目录与工作区根目录，验证操作期间目录身份未变化。 */
 static void stable_parent(int root, const char *path, int dir,
                           const char *rootpath, struct stat root_before) {
   char *name;
@@ -339,6 +365,7 @@ static void stable_parent(int root, const char *path, int dir,
   close(currentroot);
 }
 /* Performs main for the native filesystem helper. */
+/* 中文：解析命令行参数，分发扫描、复制、读取、替换或删除操作。 */
 int main(int argc, char **argv) {
   umask(077);
   signal(SIGTERM, interrupted);

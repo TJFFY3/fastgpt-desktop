@@ -1,4 +1,5 @@
 /** Implements an Electron main-process service or integration boundary. */
+/* 中文：实现 Electron 主进程服务及其与其他模块的集成接口。 */
 import { z } from 'zod';
 import {
   AppError,
@@ -11,6 +12,7 @@ import {
 import { ToolRegistry, enforceToolPolicy } from '../../../../packages/agent-core/src/index';
 import type { RunRepository } from '../../../../packages/storage/src/index';
 /** Persists or updates state while maintaining this module’s data invariants. */
+/* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
 export function createBuiltinTools() {
   const registry = new ToolRegistry(),
     args = z.strictObject({ timezone: z.string().max(128).optional() });
@@ -57,12 +59,14 @@ export function createBuiltinTools() {
   return registry;
 }
 /** Owns the module boundary represented by tool Gateway and coordinates its collaborators. */
+/* 中文：连接智能体工具请求与受策略约束的工具执行。 */
 export class ToolGateway implements ToolExecutor {
   constructor(
     private runs: RunRepository,
     private registry: ToolRegistry,
   ) {}
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   async execute(call: ToolCall, context: ToolContext, signal: AbortSignal): Promise<ToolResult> {
     throwIfAborted(signal);
     const tool = this.registry.get(call.name);

@@ -1,4 +1,5 @@
 /** Defines cross-process contracts, validation, and shared domain primitives. */
+/* 中文：定义跨进程共享的数据契约、校验规则和基础业务类型。 */
 import { z } from 'zod';
 import {
   featureEventSchemas,
@@ -8,12 +9,14 @@ import {
 const id = z.string().min(1).max(512);
 const content = z.string().max(1024 * 1024);
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const namespaceSchema = z.strictObject({
   instanceId: id,
   accountId: id,
   teamId: id,
 });
 /** Validates the cross-provider settings accepted before a model profile is persisted or invoked. */
+/* 中文：在保存模型配置或发起调用之前校验通用服务商设置。 */
 export const providerDraftSchema = z
   .strictObject({
     name: z.string().trim().min(1).max(100),
@@ -30,23 +33,27 @@ export const providerDraftSchema = z
     path: ['maxOutputTokens'],
   });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const toolCallSchema = z.strictObject({
   id,
   name: z.string().min(1).max(128),
   arguments: content,
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const toolSpecSchema = z.strictObject({
   name: z.string().min(1).max(128),
   description: z.string().max(8192),
   parameters: z.record(z.string(), z.unknown()),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const toolResultSchema = z.strictObject({
   content,
   isError: z.boolean(),
 });
 /** Enforces role-specific content and tool-call invariants for persisted and provider-bound chat messages. */
+/* 中文：校验持久化及发送给模型的聊天消息，确保消息角色、内容和工具调用之间符合约束。 */
 export const chatMessageSchema = z
   .strictObject({
     role: z.enum(['system', 'user', 'assistant', 'tool']),
@@ -65,6 +72,7 @@ export const chatMessageSchema = z
       ctx.addIssue({ code: 'custom', message: '消息不能为空' });
   });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const runStatusSchema = z.enum([
   'queued',
   'running',
@@ -77,6 +85,7 @@ export const runStatusSchema = z.enum([
   'interrupted',
 ]);
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const agentEventSchema = z.discriminatedUnion('type', [
   ...featureEventSchemas,
   z.strictObject({ type: z.literal('status'), status: runStatusSchema }),
@@ -98,12 +107,15 @@ export const agentEventSchema = z.discriminatedUnion('type', [
   }),
 ]);
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const modelProfileSchema = providerDraftSchema.extend({
+  fastgpt: z.strictObject({ appId: z.string().regex(/^[a-f\d]{24}$/i) }).optional(),
   id,
   credentialRef: id.nullable(),
   revision: id.default('legacy'),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const runInputSchema = z.strictObject({
   runId: id,
   sessionId: id,
@@ -113,16 +125,19 @@ export const runInputSchema = z.strictObject({
   tools: z.array(toolSpecSchema).max(128),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const sendMessageSchema = z.strictObject({
   sessionId: id,
   text: z.string().trim().min(1).max(65536),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const sessionDraftSchema = z.strictObject({
   title: z.string().trim().min(1).max(256),
   providerId: id,
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const sessionPatchSchema = z.strictObject({
   providerId: id.optional(),
   title: z.string().trim().min(1).max(256).optional(),
@@ -130,6 +145,7 @@ export const sessionPatchSchema = z.strictObject({
   archived: z.boolean().optional(),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const messageRecordSchema = chatMessageSchema.safeExtend({
   id,
   sessionId: id,
@@ -140,6 +156,7 @@ export const messageRecordSchema = chatMessageSchema.safeExtend({
   attachmentIds: z.array(id).max(16).default([]),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const runRecordSchema = z.strictObject({
   id,
   sessionId: id,
@@ -152,11 +169,13 @@ export const runRecordSchema = z.strictObject({
   timingUpdatedAt: z.number().nonnegative().nullable().default(null),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const sessionFilterSchema = z.strictObject({
   query: z.string().max(256).optional(),
   archived: z.boolean().optional(),
 });
 /** Validates commands sent between the main process and the isolated agent worker. */
+/* 中文：校验主进程与隔离智能体工作进程之间传递的命令。 */
 export const workerCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({
     type: z.literal('start'),
@@ -179,6 +198,7 @@ export const workerCommandSchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('shutdown') }),
 ]);
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 export const workerReplySchema = z.discriminatedUnion('type', [
   z.strictObject({ type: z.literal('ready') }),
   z.strictObject({

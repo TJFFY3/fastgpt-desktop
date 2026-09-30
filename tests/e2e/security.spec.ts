@@ -19,7 +19,7 @@ test("renderer has only the narrow bridge, CSP blocks network and keys stay off 
     ).toEqual({
       require: "undefined",
       process: "undefined",
-      keys: ["providers", "sessions", "runs", "onRunEvent"],
+      keys: ["fastgpt", "providers", "sessions", "runs", "onRunEvent"],
     });
     const sandboxed = await app.evaluate(({ app, BrowserWindow }) => {
       const pid = BrowserWindow.getAllWindows()[0].webContents.getOSProcessId();
@@ -69,6 +69,7 @@ test("renderer has only the narrow bridge, CSP blocks network and keys stay off 
       ).toBe(false);
     await page.reload();
     await page.waitForFunction(() => !!window.desktop);
+    await page.locator('.recent-row').click();
     await expect(
       page.getByText("<img src=x onerror=alert(1)>", { exact: true }),
     ).toBeVisible();

@@ -1,4 +1,5 @@
 /** Implements an Electron main-process service or integration boundary. */
+/* 中文：实现 Electron 主进程服务及其与其他模块的集成接口。 */
 import {
   AppError,
   runStartSchema,
@@ -19,6 +20,7 @@ import { RunClock } from './run-clock';
 import { RunStartService, type ContextPreparer } from './run-start-service';
 export { modelHistory } from './run-start-service';
 /** Specifies the contract callers must satisfy at this module boundary. */
+/* 中文：定义调用方在模块边界需要遵守的接口契约。 */
 export interface Supervisor {
   start(
     input: RunInput,
@@ -31,6 +33,7 @@ export interface Supervisor {
   shutdown(): Promise<void>;
 }
 /** Owns the module boundary represented by agent Service and coordinates its collaborators. */
+/* 中文：协调任务启动、运行事件、取消操作和结果持久化。 */
 export class AgentService {
   private running = new Map<
     string,
@@ -76,6 +79,7 @@ export class AgentService {
     );
   }
   /** Initializes the module operation and connects it to its required lifecycle dependencies. */
+  /* 中文：初始化模块操作，并连接执行所需的生命周期依赖。 */
   async start(n: Namespace, sessionId: string, text: string, options?: RunStartOptions) {
     const request = runStartSchema.parse({
       sessionId,
@@ -88,6 +92,7 @@ export class AgentService {
     if (this.revoked.has(namespaceKey(n)) || namespaceKey(n) !== namespaceKey(this.principal()))
       throw new AppError('PERMISSION_DENIED', '当前身份已失效');
     /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+    /* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
     const run = prepared.commit(),
       state = {
         namespace: n,
@@ -98,12 +103,14 @@ export class AgentService {
     this.running.set(run.id, state);
     this.clock.start(run.id);
     /** Implements one focused part of this module’s public responsibility. */
+    /* 中文：实现本模块职责中的一项具体操作。 */
     const event = async (value: AgentEvent) => {
       const persisted = this.store.transaction(() => {
         let messageId: string | undefined;
         const current = this.store.runs.get(n, run.id);
         if (!activeStatuses.includes(current.status)) return;
         // A cancelled worker may finish a pending round; it cannot commit a new successful response.
+        // 已取消的工作进程可能完成当前轮次，但不得再提交新的成功响应。
         if (state.controller.signal.aborted && value.type !== 'status' && value.type !== 'error')
           return;
         if (value.type === 'status') {
@@ -149,6 +156,7 @@ export class AgentService {
         this.publish(persisted);
     };
     /** Implements one focused part of this module’s public responsibility. */
+    /* 中文：实现本模块职责中的一项具体操作。 */
     const onExit = async () => {
       const current = this.store.runs.get(n, run.id);
       if (activeStatuses.includes(current.status)) {
@@ -186,12 +194,14 @@ export class AgentService {
       await event({ type: 'status', status: 'failed' });
     }
     /** Implements one focused part of this module’s public responsibility. */
+    /* 中文：实现本模块职责中的一项具体操作。 */
     function throwIfActive() {
       if (state.controller.signal.aborted) throw new AppError('ABORTED', '任务已取消');
     }
     return this.store.runs.get(n, run.id);
   }
   /** Releases managed state and prevents further use of the affected resource. */
+  /* 中文：释放受管理的状态，并阻止继续使用已失效的资源。 */
   async cancel(n: Namespace, runId: string) {
     const run = this.store.runs.get(n, runId);
     if (!activeStatuses.includes(run.status)) return;
@@ -209,6 +219,7 @@ export class AgentService {
     this.supervisor.cancel(runId);
   }
   /** Releases managed state and prevents further use of the affected resource. */
+  /* 中文：释放受管理的状态，并阻止继续使用已失效的资源。 */
   async cancelNamespace(n: Namespace) {
     this.revoked.add(namespaceKey(n));
     await Promise.all(
@@ -218,6 +229,7 @@ export class AgentService {
     );
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   timing(n: Namespace, runId: string): RunTimingSnapshot {
     const run = this.store.runs.get(n, runId),
       active = activeStatuses.includes(run.status);
@@ -228,6 +240,7 @@ export class AgentService {
     };
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   dispose(): void {
     this.clock.dispose();
   }

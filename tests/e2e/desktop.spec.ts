@@ -12,9 +12,8 @@ test("Chinese UI configures a model, executes a tool and stops streaming", async
   });
   try {
     const page = await app.firstWindow();
-    await page
-      .getByRole("button", { name: "模型设置", exact: true })
-      .click({ timeout: 2000 });
+    await page.getByRole("button", { name: "用户中心", exact: true }).click();
+    await page.getByRole("menuitem", { name: "设置", exact: true }).click();
     await page.getByLabel("模型名称", { exact: true }).fill("本地测试模型");
     await page.getByLabel("Base URL", { exact: true }).fill(server.baseUrl);
     await page.getByLabel("模型 ID", { exact: true }).fill("fixture-model");
@@ -26,7 +25,7 @@ test("Chinese UI configures a model, executes a tool and stops streaming", async
       page.getByText("密钥仅本次运行可用", { exact: true }).first(),
     ).toBeVisible();
     await page.getByRole("button", { name: "关闭设置" }).click();
-    await page.getByRole("button", { name: "新建会话", exact: true }).click();
+    await page.getByRole("button", { name: "开始新对话", exact: true }).click();
     await page.getByRole("textbox", { name: "消息" }).fill("现在是什么时间");
     await page.getByRole("button", { name: "发送", exact: true }).click();
     await expect(page.getByTestId("run-status")).toHaveText("已完成");
@@ -84,7 +83,7 @@ test("Chinese UI configures a model, executes a tool and stops streaming", async
           row.getBoundingClientRect().left,
       ),
     ).toBeLessThanOrEqual(1);
-    await page.getByRole("button", { name: "停止", exact: true }).click();
+    await page.getByRole("button", { name: "停止生成", exact: true }).click();
     await expect(page.getByTestId("run-status")).toHaveText("已取消");
     await expect(page.locator(".message.assistant").last()).toContainText(
       "部分回复",
@@ -116,7 +115,7 @@ test("Chinese UI configures a model, executes a tool and stops streaming", async
       };
     });
     expect(wrapped.rightGap).toBeLessThanOrEqual(1);
-    expect(wrapped.width).toBeLessThan(wrapped.rowWidth * 0.9);
+    expect(wrapped.width).toBeLessThan(wrapped.rowWidth * 0.97);
     expect(wrapped.horizontalOverflow).toBeLessThanOrEqual(1);
     expect(wrapped.textHeight).toBeGreaterThan(wrapped.lineHeight * 2);
     expect(

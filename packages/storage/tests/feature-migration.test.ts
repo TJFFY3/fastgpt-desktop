@@ -44,9 +44,11 @@ test("v1 migration preserves history and ciphertext without guessing message/mod
   expect(store.providers.get(n,"p").capabilities).toMatchObject({reasoningField:"none"});
   const raw=new Database(path); cleanups.push(()=>raw.close());
   expect(Array.from(raw.raw.prepare("SELECT ciphertext FROM credentials").get()!.ciphertext as Uint8Array)).toEqual([0,2,255,17]);
-  const before=JSON.stringify(store.providers.get(n,"p")); migrate(raw); migrate(raw);
+  const before=JSON.stringify(store.providers.get(n,"p"));
+  const migrationsBefore=raw.raw.prepare("SELECT version FROM schema_migrations ORDER BY version").all();
+  migrate(raw); migrate(raw);
   expect(JSON.stringify(store.providers.get(n,"p"))).toBe(before);
-  expect(raw.raw.prepare("SELECT count(*) AS n FROM schema_migrations").get()!.n).toBe(2);
+  expect(raw.raw.prepare("SELECT version FROM schema_migrations ORDER BY version").all()).toEqual(migrationsBefore);
 });
 
 test("attachments, workspace, approvals and speech persistence remain isolated by identity",()=>{

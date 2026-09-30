@@ -1,4 +1,5 @@
 /** Implements an Electron main-process service or integration boundary. */
+/* 中文：实现 Electron 主进程服务及其与其他模块的集成接口。 */
 import { z } from 'zod';
 import {
   AppError,
@@ -13,11 +14,30 @@ import {
 import { activeStatuses, type Store } from '../../../../packages/storage/src/index';
 import type { ProviderService } from './provider-service';
 import type { AgentService } from './agent-service';
+import type { FastGptService } from './fastgpt-service';
 const id = z.string().min(1).max(512),
   empty = z.strictObject({}),
   byId = z.strictObject({ id });
 /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+/* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
 const inputs = {
+  'fastgpt:create-session': z.strictObject({ appId: z.string().regex(/^[a-f\d]{24}$/i) }),
+  'fastgpt:connection': empty,
+  'fastgpt:save': z.strictObject({
+    baseUrl: z.string().min(1).max(2048),
+    apiKey: z.string().trim().min(1).max(8192),
+  }),
+  'fastgpt:disconnect': empty,
+  'fastgpt:list': z.strictObject({
+    kind: z.enum(['agents', 'knowledge']),
+    parentId: z
+      .string()
+      .regex(/^[a-f\d]{24}$/i)
+      .nullable()
+      .optional(),
+    searchKey: z.string().max(100).optional(),
+    offset: z.number().int().nonnegative().max(100000).optional(),
+  }),
   'providers:list': empty,
   'providers:save': z.strictObject({
     draft: providerDraftSchema,
@@ -41,17 +61,20 @@ const inputs = {
   }),
 };
 /** Specifies the contract callers must satisfy at this module boundary. */
+/* 中文：定义调用方在模块边界需要遵守的接口契约。 */
 interface Frame {
   url: string;
   routingId: number;
   processId: number;
 }
 /** Specifies the contract callers must satisfy at this module boundary. */
+/* 中文：定义调用方在模块边界需要遵守的接口契约。 */
 interface Sender {
   id: number;
   mainFrame: Frame;
 }
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function authorizeSender(
   event: { sender: Sender; senderFrame: Frame | null },
   expected: Sender,
@@ -77,10 +100,12 @@ export function authorizeSender(
       (!!devOrigin && url.origin === devOrigin);
   } catch {
     /* Deny malformed origins. */
+    /* 中文：拒绝格式无效的页面来源。 */
   }
   if (!allowed) throw new AppError('FORBIDDEN', '不允许的页面来源');
 }
 /** Validates or normalizes untrusted input before it crosses this module boundary. */
+/* 中文：在不可信输入进入模块前执行校验或规范化处理。 */
 export function parseIpcInput(channel: string, raw: unknown) {
   if (!Object.hasOwn(inputs, channel)) throw new AppError('FORBIDDEN', '不允许的操作');
   const parsed = inputs[channel as keyof typeof inputs].safeParse(raw);
@@ -88,6 +113,7 @@ export function parseIpcInput(channel: string, raw: unknown) {
   return parsed.data;
 }
 /** Initializes the module operation and connects it to its required lifecycle dependencies. */
+/* 中文：初始化模块操作，并连接执行所需的生命周期依赖。 */
 export function registerIpc(
   ipc: {
     handle(channel: string, listener: (event: any, raw: unknown) => Promise<unknown>): void;
@@ -96,6 +122,7 @@ export function registerIpc(
     store: Store;
     providers: ProviderService;
     agents: AgentService;
+    fastgpt?: FastGptService;
     principal: () => Namespace;
     window: () => Sender;
     devOrigin?: string;
@@ -111,6 +138,21 @@ export function registerIpc(
           n = services.principal();
         let data: unknown;
         switch (channel) {
+          case 'fastgpt:create-session':
+            data = await services.fastgpt!.createSession(n, value.appId);
+            break;
+          case 'fastgpt:connection':
+            data = services.fastgpt!.connection(n);
+            break;
+          case 'fastgpt:save':
+            data = await services.fastgpt!.save(n, value.baseUrl, value.apiKey);
+            break;
+          case 'fastgpt:disconnect':
+            data = await services.fastgpt!.disconnect(n);
+            break;
+          case 'fastgpt:list':
+            data = await services.fastgpt!.list(n, value);
+            break;
           case 'providers:list':
             data = await providers.list(n);
             break;

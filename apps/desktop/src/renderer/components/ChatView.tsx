@@ -1,8 +1,11 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
 import { Fragment, useEffect, useRef } from 'react';
 import type { MessageRecord, RunEvent, RunRecord } from '../../../../../packages/shared/src/index';
 import { RunTrace } from './RunTrace';
+import { WorkspaceIcon } from './WorkspaceIcon';
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function ChatView({
   messages,
   events,
@@ -12,6 +15,8 @@ export function ChatView({
   runs = [],
   eventsByRun = new Map(),
   onLoadRun,
+  favoriteIds = new Set(),
+  onFavorite,
 }: {
   messages: MessageRecord[];
   events: RunEvent[];
@@ -21,6 +26,8 @@ export function ChatView({
   runs?: RunRecord[];
   eventsByRun?: Map<string, RunEvent[]>;
   onLoadRun?(id: string): void;
+  favoriteIds?: Set<string>;
+  onFavorite?(message: MessageRecord): void;
 }) {
   const bottom = useRef<HTMLDivElement>(null);
   const known = new Set(messages.map((m) => m.id));
@@ -61,6 +68,7 @@ export function ChatView({
   });
   const liveRunId = events[0]?.runId;
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   const trace = (r: RunRecord) => (
     <RunTrace
       key={r.id}
@@ -75,8 +83,8 @@ export function ChatView({
       {!displayed.length && !partial ? (
         <div className="welcome">
           <div className="welcome-icon">✦</div>
-          <div className="eyebrow">YOUR PERSONAL AGENT</div>
-          <h1>让想法开始行动</h1>
+          <div className="eyebrow">开始一段工作对话</div>
+          <h1>有什么可以帮你？</h1>
           <p>
             {hasModels
               ? '在你的本地空间中，与模型对话并安全调用工具。'
@@ -129,6 +137,29 @@ export function ChatView({
                         调用工具 <code>{c.name}</code>
                       </div>
                     ))}
+                    {m.role === 'assistant' &&
+                      m.status === 'complete' &&
+                      m.content &&
+                      onFavorite && (
+                        <div className="answer-actions">
+                          <button
+                            className={favoriteIds.has(m.id) ? 'saved' : ''}
+                            aria-label={favoriteIds.has(m.id) ? '取消收藏回答' : '收藏回答'}
+                            aria-pressed={favoriteIds.has(m.id)}
+                            onClick={() => onFavorite(m)}
+                          >
+                            <WorkspaceIcon name="star" size={14} />
+                            {favoriteIds.has(m.id) ? '已收藏' : '收藏回答'}
+                          </button>
+                          <time>
+                            {new Date(m.createdAt).toLocaleTimeString('zh-CN', {
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            })}
+                          </time>
+                        </div>
+                      )}
                   </div>
                 </article>
               )}

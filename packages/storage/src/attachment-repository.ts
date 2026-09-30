@@ -1,4 +1,5 @@
 /** Implements namespaced durable storage and record conversion for desktop state. */
+/* 中文：按命名空间隔离桌面状态的持久化存储，并转换数据库记录。 */
 import {
   AppError,
   attachmentRecordSchema,
@@ -9,12 +10,14 @@ import type { Database } from './database';
 import type { SessionRepository } from './session-repository';
 import { namespaceKey } from './namespace';
 /** Owns the module boundary represented by attachment Repository and coordinates its collaborators. */
+/* 中文：管理会话附件记录的保存、查询和删除。 */
 export class AttachmentRepository {
   constructor(
     private db: Database,
     private sessions: SessionRepository,
   ) {}
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   list(n: Namespace, sid: string): AttachmentRecord[] {
     this.sessions.get(n, sid);
     return this.db.raw
@@ -23,6 +26,7 @@ export class AttachmentRepository {
       .map((r) => attachmentRecordSchema.parse(JSON.parse(r.data as string)));
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   get(n: Namespace, id: string): AttachmentRecord {
     const r = this.db.raw
       .prepare('SELECT data FROM attachments WHERE namespace_key=? AND id=?')
@@ -31,6 +35,7 @@ export class AttachmentRepository {
     return attachmentRecordSchema.parse(JSON.parse(r.data as string));
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   insert(n: Namespace, record: AttachmentRecord): void {
     const a = attachmentRecordSchema.parse(record);
     this.sessions.get(n, a.sessionId);
@@ -39,6 +44,7 @@ export class AttachmentRepository {
       .run(namespaceKey(n), a.id, a.sessionId, JSON.stringify(a));
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   markSent(n: Namespace, ids: string[], messageId: string): void {
     this.db.transaction(() => {
       const key = namespaceKey(n),
@@ -64,6 +70,7 @@ export class AttachmentRepository {
     });
   }
   /** Releases managed state and prevents further use of the affected resource. */
+  /* 中文：释放受管理的状态，并阻止继续使用已失效的资源。 */
   removeDraft(n: Namespace, id: string): void {
     const a = this.get(n, id);
     if (a.state !== 'ready') throw new AppError('INVALID_INPUT', '已发送附件不能作为草稿移除');

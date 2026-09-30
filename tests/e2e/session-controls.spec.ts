@@ -11,6 +11,7 @@ test("session controls and IME preserve the selected conversation safely", async
   try {
     const { page, session } = await configure(app, server.baseUrl);
     await page.reload();
+    await page.locator('.recent-row').click();
     const composer = page.getByRole("textbox", { name: "消息" });
     await expect(composer).toBeEnabled();
     await composer.fill("你好");
@@ -33,17 +34,24 @@ test("session controls and IME preserve the selected conversation safely", async
     await expect(composer).toHaveValue("你好\n");
     await composer.press("Enter");
     await expect(page.getByTestId("run-status")).toHaveText("已完成");
+    await expect(page.locator('.messages')).toContainText('你好');
+    await page.locator('.session-title').click();
+    await expect(page.locator('.messages')).toContainText('你好');
     await page.getByLabel("管理会话 恢复会话").click();
     await page.getByRole("button", { name: "重命名", exact: true }).click();
     await page.getByLabel("会话名称").fill("重命名会话");
     await page.getByRole("button", { name: "保存名称" }).click();
     await expect(page.locator(".session-title")).toContainText("重命名会话");
     await page.getByLabel("管理会话 重命名会话").click();
+    await expect(page.getByRole('button', { name: '置顶', exact: true })).toBeVisible();
+    await page.locator('.chat-header h2').click();
+    await expect(page.getByRole('button', { name: '置顶', exact: true })).toBeHidden();
+    await page.getByLabel("管理会话 重命名会话").click();
     await page.getByRole("button", { name: "置顶", exact: true }).click();
     await expect(page.locator(".session-title")).toContainText("◆");
     await page.getByLabel("搜索会话").fill("不存在的会话");
     await expect(page.getByText("没有匹配的会话")).toBeVisible();
-    await expect(page.locator(".chat-header h2")).toHaveText("重命名会话");
+    await expect(page.locator('.chat-breadcrumb')).toContainText('重命名会话');
     await page.getByLabel("搜索会话").fill("");
     await expect(page.locator(".session-title")).toBeVisible();
   } finally {
@@ -59,6 +67,7 @@ test("archiving or deleting the only session cannot reselect its stale ID", asyn
   try {
     const { page } = await configure(app, server.baseUrl);
     await page.reload();
+    await page.locator('.recent-row').click();
     const composer = page.getByRole("textbox", { name: "消息" });
     await expect(composer).toBeEnabled();
     await page.getByLabel("管理会话 恢复会话").click();
@@ -77,7 +86,7 @@ test("archiving or deleting the only session cannot reselect its stale ID", asyn
     await page.getByRole("button", { name: "删除", exact: true }).click();
     await expect(page.locator(".session-title")).toHaveCount(0);
     await expect(composer).toBeDisabled();
-    await expect(page.locator(".chat-header h2")).toHaveText("Agent 工作台");
+    await expect(page.locator('.chat-breadcrumb')).toContainText('新对话');
   } finally {
     await app.close();
     await server.close();

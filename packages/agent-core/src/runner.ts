@@ -1,4 +1,5 @@
 /** Coordinates agent execution, tool registration, and policy enforcement. */
+/* 中文：协调智能体执行、工具注册和工具使用策略校验。 */
 import {
   AppError,
   asAppError,
@@ -11,6 +12,7 @@ import {
   type ToolExecutor,
 } from '../../shared/src/index';
 /** Owns the module boundary represented by agent Runner and coordinates its collaborators. */
+/* 中文：负责模型调用与工具执行之间的智能体循环。 */
 export class AgentRunner {
   constructor(
     private dependencies: {
@@ -20,6 +22,7 @@ export class AgentRunner {
     },
   ) {}
   /** Initializes the module operation and connects it to its required lifecycle dependencies. */
+  /* 中文：初始化模块操作，并连接执行所需的生命周期依赖。 */
   async run(input: RunInput, apiKey: string, signal: AbortSignal): Promise<void> {
     const { model, executor, onEvent } = this.dependencies,
       messages = [...input.messages];
@@ -52,6 +55,7 @@ export class AgentRunner {
             if (!reasoningTruncated) {
               let end = Math.min(remaining, bytes.length);
               // Do not decode a partial UTF-8 codepoint at the byte budget boundary.
+              // 达到字节预算边界时，避免解码不完整的 UTF-8 字符。
               if (end < bytes.length) while (end > 0 && (bytes[end] & 0xc0) === 0x80) end--;
               if (end) {
                 reasoningBytes += end;
@@ -120,6 +124,7 @@ export class AgentRunner {
           }
         }
         /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+        /* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
         const assistant: ChatMessage = {
           role: 'assistant',
           content: text || null,
@@ -148,6 +153,7 @@ export class AgentRunner {
             };
           await onEvent({ type: 'tool_finished', id: call.id, result });
           /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+          /* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
           const message: ChatMessage = {
             role: 'tool',
             toolCallId: call.id,

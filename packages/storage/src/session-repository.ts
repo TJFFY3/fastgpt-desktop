@@ -1,4 +1,5 @@
 /** Implements namespaced durable storage and record conversion for desktop state. */
+/* 中文：按命名空间隔离桌面状态的持久化存储，并转换数据库记录。 */
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
@@ -17,8 +18,10 @@ import {
 import type { Database } from './database';
 import { namespaceKey } from './namespace';
 /** Defines the data shape exchanged through this module without exposing its implementation. */
+/* 中文：定义模块间传递的数据结构，隐藏内部实现细节。 */
 type Row = Record<string, unknown>;
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 function record(r: Row): SessionRecord {
   return {
     id: r.id as string,
@@ -34,9 +37,11 @@ function record(r: Row): SessionRecord {
   };
 }
 /** Owns the module boundary represented by session Repository and coordinates its collaborators. */
+/* 中文：管理会话、消息及会话配置的持久化。 */
 export class SessionRepository {
   constructor(private db: Database) {}
   /** Persists or updates state while maintaining this module’s data invariants. */
+  /* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
   create(n: Namespace, draft: SessionDraft): SessionRecord {
     const value = sessionDraftSchema.parse(draft),
       key = namespaceKey(n);
@@ -56,6 +61,7 @@ export class SessionRepository {
     return this.get(n, id);
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   get(n: Namespace, id: string): SessionRecord {
     const r = this.db.raw
       .prepare('SELECT * FROM sessions WHERE namespace_key=? AND id=?')
@@ -64,6 +70,7 @@ export class SessionRepository {
     return record(r);
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   list(n: Namespace, filter: SessionFilter = {}): SessionRecord[] {
     return this.db.raw
       .prepare(
@@ -78,11 +85,23 @@ export class SessionRepository {
       .map(record);
   }
   /** Persists or updates state while maintaining this module’s data invariants. */
+  /* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
   update(n: Namespace, id: string, patch: SessionPatch): SessionRecord {
     return this.db.transaction(() => {
       const current = this.get(n, id),
         p = sessionPatchSchema.parse(patch);
       if (p.providerId !== undefined) {
+        const target = this.db.raw
+          .prepare('SELECT data FROM providers WHERE namespace_key=? AND id=?')
+          .get(namespaceKey(n), current.providerId);
+        const next = this.db.raw
+          .prepare('SELECT data FROM providers WHERE namespace_key=? AND id=?')
+          .get(namespaceKey(n), p.providerId);
+        if (
+          JSON.parse(target!.data as string).fastgpt ||
+          (next && JSON.parse(next.data as string).fastgpt)
+        )
+          throw new AppError('REMOTE_TARGET_FIXED', '远程应用会话不能切换模型或应用，请新建会话');
         if (
           this.db.raw
             .prepare(
@@ -115,6 +134,7 @@ export class SessionRepository {
     });
   }
   /** Releases managed state and prevents further use of the affected resource. */
+  /* 中文：释放受管理的状态，并阻止继续使用已失效的资源。 */
   remove(n: Namespace, id: string) {
     this.get(n, id);
     if (
@@ -130,6 +150,7 @@ export class SessionRepository {
       .run(namespaceKey(n), id);
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   messages(n: Namespace, id: string): MessageRecord[] {
     this.get(n, id);
     return this.db.raw
@@ -138,6 +159,7 @@ export class SessionRepository {
       .map((r) => messageRecordSchema.parse(JSON.parse(r.data as string)));
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   appendMessage(
     n: Namespace,
     id: string,
@@ -155,6 +177,7 @@ export class SessionRepository {
           )
           .get(key, id)!;
       /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+      /* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
       const result: MessageRecord = {
         runId: metadata.runId ?? null,
         attachmentIds: metadata.attachmentIds ?? [],

@@ -1,6 +1,8 @@
 /** Adapts provider-compatible requests and streaming responses to shared model contracts. */
+/* 中文：将模型服务商的请求和流式响应转换为项目共享的模型协议。 */
 import { AppError } from '../../shared/src/index';
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function httpError(status: number): AppError {
   if (status === 401 || status === 403)
     return new AppError('AUTH_FAILED', '模型认证失败，请检查密钥和权限');

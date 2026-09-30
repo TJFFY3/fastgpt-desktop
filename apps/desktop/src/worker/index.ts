@@ -1,8 +1,10 @@
 /** Runs the isolated worker-side protocol adapter used by agent execution. */
+/* 中文：在隔离工作进程中运行智能体执行所需的协议适配逻辑。 */
 import type {} from 'electron';
 import { randomUUID } from 'node:crypto';
 import { AgentRunner } from '../../../../packages/agent-core/src/index';
 import { OpenAiChatAdapter } from '../../../../packages/model-adapter/src/index';
+import { FastGptChat } from '../../../../packages/model-adapter/src/fastgpt-chat';
 import {
   AppError,
   workerCommandSchema,
@@ -24,6 +26,7 @@ const controller = new AbortController();
 let runId: string | undefined,
   started = false;
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 function request(message: WorkerReply & { requestId: string }): Promise<ToolResult | undefined> {
   return new Promise((resolve, reject) => {
     const timer = setTimeout(() => {
@@ -78,7 +81,16 @@ port.on('message', async ({ data }: { data: unknown }) => {
       },
     });
     try {
-      await runner.run(command.input, command.apiKey, controller.signal);
+      if (command.input.profile.fastgpt) {
+        await new FastGptChat().run(
+          command.input,
+          command.apiKey,
+          controller.signal,
+          async (event) => {
+            await request({ type: 'event', runId: runId!, requestId: randomUUID(), event });
+          },
+        );
+      } else await runner.run(command.input, command.apiKey, controller.signal);
     } catch {
       process.exit(1);
     } finally {

@@ -14,7 +14,7 @@ test("per-run traces retain explanations, public reasoning, elapsed time and two
       const second=await window.desktop.providers.save({...draft,name:"模型 B",modelId:"model-B",capabilities:{...draft.capabilities,reasoningField:"reasoning_content"}},"TRACE_SECRET");
       const session=await window.desktop.sessions.create({title:"执行轨迹",providerId:first.id});return {first:first.id,second:second.id,session:session.id};
     },{...validDraft,baseUrl:server.baseUrl,allowInsecureHttp:true});
-    await page.reload();await expect(page.getByLabel("当前模型")).toHaveValue(ids.first);
+    await page.reload();await page.locator('.recent-row').click();await expect(page.getByLabel("当前模型")).toHaveValue(ids.first);
     await page.getByRole("textbox",{name:"消息"}).fill("时间轨迹");await page.getByRole("button",{name:"发送",exact:true}).click();
     await expect(page.getByText("工具前解释",{exact:true})).toBeVisible();await expect(page.getByLabel("当前模型")).toBeDisabled();
     await expect(page.getByTestId("run-status")).toHaveText("已完成");

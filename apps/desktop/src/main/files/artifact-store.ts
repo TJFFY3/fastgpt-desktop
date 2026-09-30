@@ -1,4 +1,5 @@
 /** Enforces the main-process filesystem safety boundary for workspace artifacts. */
+/* 中文：在主进程中执行工作区文件及快照的文件系统安全校验。 */
 import { constants } from 'node:fs';
 import { mkdir, lstat, chmod, open, rename, unlink, rm, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -12,10 +13,13 @@ import {
 import type { SafeFileOps } from './safe-file-ops';
 import { assertNoPathCollisions, safeRelativePath } from './path-policy';
 /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+/* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
 const limits = { maxEntries: 10000, maxFileBytes: 100 * 1024 * 1024, maxTotalBytes: 1024 ** 3 };
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 const keySchema = z.string().uuid();
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 const ownerSchema = z.strictObject({
   key: keySchema,
   device: z.string(),
@@ -23,8 +27,10 @@ const ownerSchema = z.strictObject({
   state: z.enum(['temporary', 'promoted']),
 });
 /** Defines the data shape exchanged through this module without exposing its implementation. */
+/* 中文：定义模块间传递的数据结构，隐藏内部实现细节。 */
 type Owner = z.infer<typeof ownerSchema>;
 /** Owns the module boundary represented by artifact Store and coordinates its collaborators. */
+/* 中文：管理文件快照、归属记录和快照内容访问。 */
 export class ArtifactStore implements SandboxFileBridge {
   private initialized: Promise<void> | undefined;
   private entries = new Map<string, Map<string, { size: number; kind: 'file' | 'directory' }>>();
@@ -37,6 +43,7 @@ export class ArtifactStore implements SandboxFileBridge {
     this.root = resolve(root);
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   private initialize(): Promise<void> {
     return (this.initialized ??= (async () => {
       await mkdir(this.root, { recursive: true, mode: 0o700 });
@@ -52,6 +59,7 @@ export class ArtifactStore implements SandboxFileBridge {
     })());
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   private async owned(key: string): Promise<Owner> {
     if (!keySchema.safeParse(key).success) throw new AppError('UNSAFE_PATH', '快照编号无效');
     await this.initialize();

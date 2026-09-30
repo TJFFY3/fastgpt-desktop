@@ -1,6 +1,8 @@
 /** Adapts provider-compatible requests and streaming responses to shared model contracts. */
+/* 中文：将模型服务商的请求和流式响应转换为项目共享的模型协议。 */
 import { AppError, throwIfAborted } from '../../shared/src/index';
 /** Validates or normalizes untrusted input before it crosses this module boundary. */
+/* 中文：在不可信输入进入模块前执行校验或规范化处理。 */
 export async function* parseSse(
   body: ReadableStream<Uint8Array>,
   signal: AbortSignal,
@@ -13,6 +15,7 @@ export async function* parseSse(
     lines: string[] = [],
     size = 0;
   /** Releases managed state and prevents further use of the affected resource. */
+  /* 中文：释放受管理的状态，并阻止继续使用已失效的资源。 */
   const cancel = () => {
     void reader.cancel().catch(() => {});
   };
@@ -48,6 +51,7 @@ export async function* parseSse(
         } else if (field === 'event') event = text;
       }
       if (done) break; // An incomplete final frame is never dispatched.
+      // 不分发流末尾尚未接收完整的数据帧。
     }
   } finally {
     signal.removeEventListener('abort', cancel);

@@ -1,4 +1,5 @@
 /** Implements namespaced durable storage and record conversion for desktop state. */
+/* 中文：按命名空间隔离桌面状态的持久化存储，并转换数据库记录。 */
 import { randomUUID } from 'node:crypto';
 import {
   AppError,
@@ -27,6 +28,7 @@ export const activeStatuses: RunStatus[] = [
   'cancelling',
 ];
 /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+/* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
 const allowed: Partial<Record<RunStatus, RunStatus[]>> = {
   queued: ['running', 'cancelling', 'cancelled', 'failed', 'interrupted'],
   running: [
@@ -43,6 +45,7 @@ const allowed: Partial<Record<RunStatus, RunStatus[]>> = {
   cancelling: ['cancelled', 'failed', 'interrupted'],
 };
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 function record(r: Record<string, unknown>): RunRecord {
   return runRecordSchema.parse({
     id: r.id as string,
@@ -57,6 +60,7 @@ function record(r: Record<string, unknown>): RunRecord {
   });
 }
 /** Owns the module boundary represented by run Repository and coordinates its collaborators. */
+/* 中文：管理运行状态、运行事件和耗时记录的持久化。 */
 export class RunRepository {
   constructor(
     private db: Database,
@@ -64,6 +68,7 @@ export class RunRepository {
     private attachments: AttachmentRepository,
   ) {}
   /** Persists or updates state while maintaining this module’s data invariants. */
+  /* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
   createWithUserMessage(
     n: Namespace,
     sessionId: string,
@@ -105,6 +110,7 @@ export class RunRepository {
     });
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   get(n: Namespace, id: string): RunRecord {
     const row = this.db.raw
       .prepare('SELECT * FROM runs WHERE namespace_key=? AND id=?')
@@ -113,6 +119,7 @@ export class RunRepository {
     return record(row);
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   list(n: Namespace, sessionId: string): RunRecord[] {
     this.sessions.get(n, sessionId);
     return this.db.raw
@@ -123,6 +130,7 @@ export class RunRepository {
       .map(record);
   }
   /** Persists or updates state while maintaining this module’s data invariants. */
+  /* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
   saveTiming(n: Namespace, id: string, elapsedMs: number): RunRecord {
     const run = this.get(n, id);
     if (!Number.isFinite(elapsedMs) || elapsedMs < 0)
@@ -136,6 +144,7 @@ export class RunRepository {
     return this.get(n, id);
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   transition(
     n: Namespace,
     id: string,
@@ -151,6 +160,7 @@ export class RunRepository {
     return this.get(n, id);
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   appendEvent(
     n: Namespace,
     id: string,
@@ -167,6 +177,7 @@ export class RunRepository {
           )
           .get(key, id)!;
       /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+      /* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
       const result = {
         ...value,
         ...(metadata ? { messageId: metadata.messageId } : {}),
@@ -190,6 +201,7 @@ export class RunRepository {
     });
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   events(n: Namespace, id: string, afterSeq = 0): RunEvent[] {
     this.get(n, id);
     return this.db.raw
@@ -200,6 +212,7 @@ export class RunRepository {
       .map((r) => JSON.parse(r.data as string));
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   recoverInterrupted(): number {
     return this.db.transaction(() => {
       const rows = this.db.raw
@@ -209,6 +222,7 @@ export class RunRepository {
         .all();
       for (const row of rows) {
         /** Captures domain configuration or protocol data whose fields are consumed together by this module. */
+        /* 中文：组织本模块需要共同使用的业务配置或协议数据。 */
         const [instanceId, accountId, teamId] = JSON.parse(row.namespace_key as string),
           n = { instanceId, accountId, teamId },
           run = record(row);
@@ -238,6 +252,7 @@ export class RunRepository {
     });
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   reserveToolCall(
     n: Namespace,
     id: string,
@@ -263,6 +278,7 @@ export class RunRepository {
     });
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   toolResult(n: Namespace, id: string, callId: string): ToolResult | null {
     this.get(n, id);
     const r = this.db.raw
@@ -271,6 +287,7 @@ export class RunRepository {
     return r?.result ? JSON.parse(r.result as string) : null;
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   completeToolCall(n: Namespace, id: string, callId: string, result: ToolResult) {
     this.get(n, id);
     const changed = this.db.raw

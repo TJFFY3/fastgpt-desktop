@@ -1,7 +1,9 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
-import { useState } from 'react';
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
+import { useEffect, useRef, useState } from 'react';
 import type { SessionRecord } from '../../../../../packages/shared/src/index';
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function SessionSidebar(p: {
   sessions: SessionRecord[];
   selectedId: string | null;
@@ -11,7 +13,6 @@ export function SessionSidebar(p: {
   onArchived(value: boolean): void;
   onSelect(id: string): void;
   onNew(): void;
-  onSettings(): void;
   onUpdate(
     id: string,
     patch: { title?: string; pinned?: boolean; archived?: boolean },
@@ -20,12 +21,39 @@ export function SessionSidebar(p: {
 }) {
   const [editing, setEditing] = useState<string | null>(null),
     [title, setTitle] = useState('');
+  const sidebar = useRef<HTMLElement>(null);
+  /* 中文：点击菜单以外的任何位置或按 Escape 时关闭已打开的会话操作菜单。 */
+  useEffect(() => {
+    const closeOutside = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      sidebar.current
+        ?.querySelectorAll<HTMLDetailsElement>('.session-menu[open]')
+        .forEach((menu) => {
+          if (!menu.contains(target)) menu.open = false;
+        });
+    };
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      sidebar.current
+        ?.querySelectorAll<HTMLDetailsElement>('.session-menu[open]')
+        .forEach((menu) => {
+          menu.open = false;
+        });
+    };
+    document.addEventListener('pointerdown', closeOutside);
+    document.addEventListener('keydown', closeOnEscape);
+    return () => {
+      document.removeEventListener('pointerdown', closeOutside);
+      document.removeEventListener('keydown', closeOnEscape);
+    };
+  }, []);
   return (
-    <aside className="sidebar">
+    <aside ref={sidebar} className="sidebar conversation-sidebar" aria-label="会话历史">
       <div className="brand">
         <span className="brand-mark">F</span>
         <div>
-          FastGPT<span>DESKTOP AGENT</span>
+          会话历史<span>随时继续你的工作</span>
         </div>
       </div>
       <button className="new-session" aria-label="新建会话" onClick={p.onNew}>
@@ -73,7 +101,13 @@ export function SessionSidebar(p: {
                   <span>{s.pinned ? '◆' : '◇'}</span>
                   <span>{s.title}</span>
                 </button>
-                <details className="session-menu">
+                <details
+                  className="session-menu"
+                  onClick={(event) => {
+                    if ((event.target as HTMLElement).closest('button'))
+                      event.currentTarget.open = false;
+                  }}
+                >
                   <summary aria-label={`管理会话 ${s.title}`}>···</summary>
                   <div>
                     <button
@@ -102,18 +136,6 @@ export function SessionSidebar(p: {
         {!p.sessions.length && (
           <p className="sidebar-empty">{p.query ? '没有匹配的会话' : '从一个新会话开始'}</p>
         )}
-      </div>
-      <div className="sidebar-bottom">
-        <button className="settings-button" aria-label="模型设置" onClick={p.onSettings}>
-          ⚙ 模型设置
-        </button>
-        <div className="identity">
-          <span className="avatar">L</span>
-          <div>
-            本地空间<span>个人工作区 · 本机保存</span>
-          </div>
-          <span className="online-dot" />
-        </div>
       </div>
     </aside>
   );

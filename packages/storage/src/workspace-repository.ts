@@ -1,4 +1,5 @@
 /** Implements namespaced durable storage and record conversion for desktop state. */
+/* 中文：按命名空间隔离桌面状态的持久化存储，并转换数据库记录。 */
 import {
   AppError,
   workspaceRecordSchema,
@@ -9,12 +10,14 @@ import type { Database } from './database';
 import type { SessionRepository } from './session-repository';
 import { namespaceKey } from './namespace';
 /** Owns the module boundary represented by workspace Repository and coordinates its collaborators. */
+/* 中文：管理会话工作区记录及其版本关联。 */
 export class WorkspaceRepository {
   constructor(
     private db: Database,
     private sessions: SessionRepository,
   ) {}
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   getForSession(n: Namespace, sid: string): WorkspaceRecord | null {
     this.sessions.get(n, sid);
     const r = this.db.raw
@@ -23,6 +26,7 @@ export class WorkspaceRepository {
     return r ? workspaceRecordSchema.parse(JSON.parse(r.data as string)) : null;
   }
   /** Persists or updates state while maintaining this module’s data invariants. */
+  /* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
   save(n: Namespace, record: WorkspaceRecord): void {
     this.db.transaction(() => {
       const w = workspaceRecordSchema.parse(record),

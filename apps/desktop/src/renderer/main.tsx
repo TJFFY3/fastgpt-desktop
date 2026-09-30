@@ -1,4 +1,5 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 import App from './App';

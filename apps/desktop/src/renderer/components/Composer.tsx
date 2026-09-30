@@ -1,16 +1,21 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
 import { useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function Composer({
   busy,
   stopping,
   disabled,
+  modelPicker,
   onSend,
   onStop,
 }: {
   busy: boolean;
   stopping: boolean;
   disabled: boolean;
+  modelPicker?: ReactNode;
   onSend(text: string): Promise<boolean>;
   onStop(): void;
 }) {
@@ -18,6 +23,7 @@ export function Composer({
     composing = useRef(false),
     sending = useRef(false);
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   const send = async () => {
     if (sending.current || busy || disabled || !text.trim()) return;
     sending.current = true;
@@ -55,21 +61,24 @@ export function Composer({
         }}
       />
       <div className="composer-footer">
-        <span>模型回复仅作参考 · 工具执行受权限限制</span>
-        {busy ? (
-          <button className="stop" disabled={stopping} onClick={onStop}>
-            {stopping ? '停止中…' : '停止'}
-          </button>
-        ) : (
-          <button
-            className="primary"
-            aria-label="发送"
-            disabled={disabled || !text.trim()}
-            onClick={() => void send()}
-          >
-            发送 <span aria-hidden="true">↵</span>
-          </button>
-        )}
+        <span>Enter 发送 · Shift+Enter 换行</span>
+        <div className="composer-actions">
+          {modelPicker}
+          {busy ? (
+            <button className="stop" disabled={stopping} onClick={onStop}>
+              {stopping ? '停止中…' : '停止生成'}
+            </button>
+          ) : (
+            <button
+              className="primary"
+              aria-label="发送"
+              disabled={disabled || !text.trim()}
+              onClick={() => void send()}
+            >
+              发送 <span aria-hidden="true">↵</span>
+            </button>
+          )}
+        </div>
       </div>
     </div>
   );

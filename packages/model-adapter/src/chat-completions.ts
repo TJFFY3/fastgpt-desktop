@@ -1,4 +1,5 @@
 /** Adapts provider-compatible requests and streaming responses to shared model contracts. */
+/* 中文：将模型服务商的请求和流式响应转换为项目共享的模型协议。 */
 import { setTimeout as delay } from 'node:timers/promises';
 import { z } from 'zod';
 import {
@@ -16,6 +17,7 @@ const fn = z.object({
   arguments: z.string().optional(),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 const deltaSchema = z.object({
   reasoning_content: z.unknown().optional(),
   content: z.string().nullable().optional(),
@@ -30,6 +32,7 @@ const deltaSchema = z.object({
     .optional(),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 const chunkSchema = z.object({
   choices: z.array(
     z.object({
@@ -46,6 +49,7 @@ const chunkSchema = z.object({
     .optional(),
 });
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 const responseSchema = z.object({
   choices: z
     .array(
@@ -72,6 +76,7 @@ const responseSchema = z.object({
   usage: chunkSchema.shape.usage,
 });
 /** Validates or normalizes untrusted input before it crosses this module boundary. */
+/* 中文：在不可信输入进入模块前执行校验或规范化处理。 */
 function parse<T>(schema: z.ZodType<T>, text: string): T {
   try {
     return schema.parse(JSON.parse(text));
@@ -80,6 +85,7 @@ function parse<T>(schema: z.ZodType<T>, text: string): T {
   }
 }
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 function requestBody(r: ModelRequest, stream: boolean) {
   return {
     model: r.profile.modelId,
@@ -109,15 +115,19 @@ function requestBody(r: ModelRequest, stream: boolean) {
   };
 }
 /** Owns the module boundary represented by open Ai Chat Adapter and coordinates its collaborators. */
+/* 中文：将 OpenAI 兼容的聊天接口适配为统一模型调用接口。 */
 export class OpenAiChatAdapter implements ModelAdapter {
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   async *stream(r: ModelRequest): AsyncGenerator<ModelEvent> {
     yield* this.perform(r, true);
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   private async *perform(r: ModelRequest, stream: boolean): AsyncGenerator<ModelEvent> {
     const endpoint = normalizeChatEndpoint(r.profile.baseUrl);
     /** Implements one focused part of this module’s public responsibility. */
+    /* 中文：实现本模块职责中的一项具体操作。 */
     const reasoning = (value: unknown): string | undefined => {
       if (r.profile.capabilities.reasoningField !== 'reasoning_content' || value == null) return;
       if (typeof value !== 'string')

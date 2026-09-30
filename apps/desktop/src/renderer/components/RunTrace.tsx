@@ -1,4 +1,5 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
 import type {
   ApprovalDecision,
   RunEvent,
@@ -7,6 +8,7 @@ import type {
 import { useRunTimer } from '../hooks/useRunTimer';
 import { statusLabel } from './RunDetails';
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function formatDuration(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return seconds < 60 ? `${seconds} 秒` : `${Math.floor(seconds / 60)} 分 ${seconds % 60} 秒`;

@@ -1,5 +1,7 @@
 /** Owns the module boundary represented by app Error and coordinates its collaborators. */
+/* 中文：携带应用错误码及可向用户安全展示的错误信息。 */
 /** Defines cross-process contracts, validation, and shared domain primitives. */
+/* 中文：定义跨进程共享的数据契约、校验规则和基础业务类型。 */
 export class AppError extends Error {
   constructor(
     public readonly code: string,

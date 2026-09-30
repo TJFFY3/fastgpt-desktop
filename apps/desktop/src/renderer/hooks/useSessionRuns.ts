@@ -1,7 +1,9 @@
 /** Defines renderer UI behavior and presentation for the desktop chat workspace. */
+/* 中文：定义桌面聊天工作区的渲染层界面和交互行为。 */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { RunEvent, RunRecord } from '../../../../../packages/shared/src/index';
 /** Provides the UI state and lifecycle integration consumed by this renderer feature. */
+/* 中文：为界面功能提供状态管理及生命周期衔接。 */
 export function useSessionRuns(sessionId: string | null) {
   const scope = useRef({ sessionId, generation: 0 });
   const [runs, setRuns] = useState<RunRecord[]>([]),

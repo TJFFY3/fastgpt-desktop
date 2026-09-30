@@ -22,14 +22,14 @@ test("a delayed start for A cannot overwrite B after selection changes", async (
       .fill("慢回复，只属于会话 A");
     await page.getByRole("button", { name: "发送", exact: true }).click();
     await page.getByRole("button", { name: /会话 B/ }).click();
-    await expect(page.locator(".chat-header h2")).toHaveText("会话 B");
+    await expect(page.locator('.chat-breadcrumb')).toContainText('会话 B');
     await expect.poll(() => server.requests.length).toBe(1);
     await expect(page.locator(".chat-scroll")).not.toContainText(
       "慢回复，只属于会话 A",
     );
     await expect(page.getByTestId("run-status")).toHaveCount(0);
     await expect(
-      page.getByRole("button", { name: "停止", exact: true }),
+      page.getByRole("button", { name: "停止生成", exact: true }),
     ).toHaveCount(0);
   } finally {
     await app.close();

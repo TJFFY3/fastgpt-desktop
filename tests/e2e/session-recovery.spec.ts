@@ -58,6 +58,7 @@ test("restarts with saved sessions, tool results and a missing session-only key"
     await expect(
       reopened.getByText("保留的标题", { exact: true }).first(),
     ).toBeVisible();
+    await reopened.locator('.recent-row').click();
     await expect(reopened.getByText("此模型需要重新填写密钥。")).toBeVisible();
   } finally {
     await app.close();

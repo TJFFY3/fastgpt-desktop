@@ -1,4 +1,5 @@
 /** Authority for elapsed time: wall-clock timestamps never participate in durations. */
+/* 中文：统一管理运行耗时；计算持续时间时不使用可能跳变的系统时钟。 */
 export class RunClock {
   private active = new Map<
     string,
@@ -11,6 +12,7 @@ export class RunClock {
     private onError: (runId: string, error: unknown) => void = () => {},
   ) {}
   /** Initializes the module operation and connects it to its required lifecycle dependencies. */
+  /* 中文：初始化模块操作，并连接执行所需的生命周期依赖。 */
   start(runId: string): void {
     if (this.active.has(runId) || this.finished.has(runId))
       throw new Error('Clock already started');
@@ -27,6 +29,7 @@ export class RunClock {
     this.active.set(runId, { started, last: 0, timer });
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   elapsed(runId: string): number {
     const state = this.active.get(runId);
     if (!state) return this.finished.get(runId) ?? 0;
@@ -34,12 +37,14 @@ export class RunClock {
     return state.last;
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   checkpoint(runId: string): number {
     const elapsed = this.elapsed(runId);
     if (this.active.has(runId)) this.persist(runId, elapsed);
     return elapsed;
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   finish(runId: string): number {
     const state = this.active.get(runId),
       elapsed = this.checkpoint(runId);
@@ -52,6 +57,7 @@ export class RunClock {
     return elapsed;
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   dispose(): void {
     for (const state of this.active.values()) clearInterval(state.timer);
     this.active.clear();

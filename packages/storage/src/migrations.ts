@@ -1,8 +1,10 @@
 /** Implements namespaced durable storage and record conversion for desktop state. */
+/* 中文：按命名空间隔离桌面状态的持久化存储，并转换数据库记录。 */
 import type { Database } from './database';
 import { randomUUID } from 'node:crypto';
 import { AppError, modelProfileSchema, messageRecordSchema } from '../../shared/src/index';
 /** Persists or updates state while maintaining this module’s data invariants. */
+/* 中文：保存或更新状态，同时维持本模块的数据一致性约束。 */
 export function migrate(db: Database): void {
   db.transaction(() => {
     db.raw.exec('CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY)');
@@ -10,7 +12,7 @@ export function migrate(db: Database): void {
       db.raw.prepare('SELECT COALESCE(MAX(version),0) AS version FROM schema_migrations').get()!
         .version,
     );
-    if (version > 2) throw new AppError('SCHEMA_TOO_NEW', '数据库版本较新，请更新应用');
+    if (version > 3) throw new AppError('SCHEMA_TOO_NEW', '数据库版本较新，请更新应用');
     if (version === 0)
       db.raw.exec(`
     CREATE TABLE IF NOT EXISTS schema_migrations(version INTEGER PRIMARY KEY);
@@ -40,6 +42,7 @@ export function migrate(db: Database): void {
         CREATE TABLE transcription_configs(namespace_key TEXT PRIMARY KEY NOT NULL,data TEXT NOT NULL);
       `);
       // Normalize explicit defaults only; never infer a historical model or run from timestamps.
+      // 只补齐明确的默认值，不根据时间戳推断历史模型或运行记录。
       for (const row of db.raw.prepare('SELECT namespace_key,id,data FROM providers').all()) {
         const old = JSON.parse(row.data as string),
           profile = modelProfileSchema.parse({ ...old, revision: randomUUID() });
@@ -58,6 +61,11 @@ export function migrate(db: Database): void {
           .run(JSON.stringify(value), row.namespace_key as string, row.id as string);
       }
       db.raw.exec('INSERT INTO schema_migrations(version) VALUES(2)');
+    }
+    if (version < 3) {
+      db.raw.exec(
+        'CREATE TABLE fastgpt_connections(namespace_key TEXT PRIMARY KEY NOT NULL, base_url TEXT NOT NULL, credential_ref TEXT NOT NULL); INSERT INTO schema_migrations(version) VALUES(3)',
+      );
     }
   });
 }

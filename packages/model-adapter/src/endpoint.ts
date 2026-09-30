@@ -1,6 +1,8 @@
 /** Adapts provider-compatible requests and streaming responses to shared model contracts. */
+/* 中文：将模型服务商的请求和流式响应转换为项目共享的模型协议。 */
 import { AppError } from '../../shared/src/index';
 /** Validates or normalizes untrusted input before it crosses this module boundary. */
+/* 中文：在不可信输入进入模块前执行校验或规范化处理。 */
 export function normalizeChatEndpoint(baseUrl: string): URL {
   let url: URL;
   try {

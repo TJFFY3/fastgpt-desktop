@@ -1,4 +1,5 @@
 /** Enforces the main-process filesystem safety boundary for workspace artifacts. */
+/* 中文：在主进程中执行工作区文件及快照的文件系统安全校验。 */
 import { execFile } from 'node:child_process';
 import { lstat, realpath } from 'node:fs/promises';
 import { randomUUID } from 'node:crypto';
@@ -10,6 +11,7 @@ import {
 } from '../../../../../packages/shared/src/index';
 import { assertNoPathCollisions, safeRelativePath } from './path-policy';
 /** Defines the data shape exchanged through this module without exposing its implementation. */
+/* 中文：定义模块间传递的数据结构，隐藏内部实现细节。 */
 export type FileFingerprint = {
   sha256: string;
   size: number;
@@ -18,8 +20,10 @@ export type FileFingerprint = {
   mtimeNs: string;
 };
 /** Defines the data shape exchanged through this module without exposing its implementation. */
+/* 中文：定义模块间传递的数据结构，隐藏内部实现细节。 */
 export type FileLimits = { maxEntries: number; maxFileBytes: number; maxTotalBytes: number };
 /** Validates serialized or untrusted values before they enter the shared domain model. */
+/* 中文：在序列化数据或不可信输入进入共享业务模型前执行校验。 */
 const fingerprintSchema = z.strictObject({
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
   size: z
@@ -41,9 +45,11 @@ const safeCodes = new Set([
   'SAFE_FILES_FAILED',
 ]);
 /** Owns the module boundary represented by safe File Ops and coordinates its collaborators. */
+/* 中文：封装原生安全文件助手，执行受约束的文件访问。 */
 export class SafeFileOps {
   constructor(private helperPath: string) {}
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   private async root(root: string): Promise<string[]> {
     if (process.platform === 'win32')
       throw new AppError('SAFE_FILES_UNAVAILABLE', '此平台安全文件操作尚不可用');
@@ -53,6 +59,7 @@ export class SafeFileOps {
     return [await realpath(root), String(stat.dev), String(stat.ino)];
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   private invoke(args: string[], maxBuffer = 16 * 1024 * 1024): Promise<Buffer> {
     return new Promise((resolve, reject) =>
       execFile(
@@ -85,6 +92,7 @@ export class SafeFileOps {
     );
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   async scan(root: string, limits: FileLimits): Promise<FileEntry[]> {
     if (
       ![limits.maxEntries, limits.maxFileBytes, limits.maxTotalBytes].every(
@@ -120,6 +128,7 @@ export class SafeFileOps {
     }
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   async copyInto(
     root: string,
     path: string,
@@ -141,6 +150,7 @@ export class SafeFileOps {
     );
   }
   /** Returns data through this module while preserving its ownership and consistency rules. */
+  /* 中文：按本模块的归属校验和一致性规则查询并返回数据。 */
   async read(root: string, path: string, offset: number, max: number): Promise<Uint8Array> {
     safeRelativePath(path);
     if (
@@ -159,6 +169,7 @@ export class SafeFileOps {
     );
   }
   /** Implements one focused part of this module’s public responsibility. */
+  /* 中文：实现本模块职责中的一项具体操作。 */
   private expected(value: FileFingerprint | null): string {
     if (!value) return 'absent';
     const v = fingerprintSchema.parse(value);

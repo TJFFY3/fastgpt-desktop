@@ -1,10 +1,12 @@
 /** Implements an Electron main-process service or integration boundary. */
+/* 中文：实现 Electron 主进程服务及其与其他模块的集成接口。 */
 import { resolve, sep } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { AppError } from '../../../../packages/shared/src/index';
 export const productionCsp =
   "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; font-src 'self'; connect-src 'none'; object-src 'none'; base-uri 'none'; frame-src 'none'; form-action 'none'";
 /** Implements one focused part of this module’s public responsibility. */
+/* 中文：实现本模块职责中的一项具体操作。 */
 export function resourcePath(value: string, root: string) {
   const url = new URL(value);
   let pathname: string;
